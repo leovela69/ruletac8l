@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "C8L Ruleta - Casino Premium",
@@ -19,7 +20,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-black overflow-hidden">{children}</body>
+      <body className="bg-black overflow-hidden">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
