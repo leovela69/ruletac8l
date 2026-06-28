@@ -33,7 +33,10 @@ export default function RouletteWheel3D() {
   const NUM_RING_OUTER = WOOD_R - 22;
   const NUM_RING_INNER = NUM_RING_OUTER - 38;
   const CONE_R = NUM_RING_INNER - 10;
-  const BALL_TRACK = WOOD_R - 12;
+  // Ball track is on the WOOD ring, OUTSIDE the numbers
+  const BALL_TRACK = (WOOD_R + NUM_RING_OUTER) / 2 + 4; // Middle of wood area
+  // Where ball settles inside numbers
+  const BALL_POCKET = (NUM_RING_OUTER + NUM_RING_INNER) / 2;
   const SEGMENTS = 37;
   const SEG_ANGLE = (2 * Math.PI) / SEGMENTS;
 
@@ -306,94 +309,107 @@ export default function RouletteWheel3D() {
 
       switch (state.phase) {
         case "spinning": {
-          // Smooth deceleration with very gentle curve
+          // Ball rolls on the WOOD track (outside numbers), opposite to wheel
           state.wheelRotation += state.wheelSpeed;
           state.ballAngle += state.ballSpeed;
-          // Very gentle deceleration — spins for a long time
-          state.ballSpeed *= 0.9992;
+          // Very gentle deceleration — ball rolls a long time on wood
+          state.ballSpeed *= 0.9993;
           state.wheelSpeed *= 0.9996;
+          // Ball stays on wood track
+          state.ballRadius = BALL_TRACK;
 
-          // Tick sound synced to segments passing
+          // Tick sound as ball passes over deflectors
           state.tickCooldown--;
           const angleDiff = Math.abs(state.ballAngle - state.lastTickAngle);
           if (angleDiff > SEG_ANGLE && state.tickCooldown <= 0) {
             state.lastTickAngle = state.ballAngle;
-            state.tickCooldown = 2; // Prevent too many ticks
+            state.tickCooldown = 2;
             audioEngine.playBallTick();
           }
 
-          // Ball spins much longer (5+ seconds) before deceleration phase
-          if (elapsed > 5.0) {
+          // After 5+ seconds on wood, ball loses enough speed to fall inward
+          if (elapsed > 5.5 || Math.abs(state.ballSpeed) < 0.04) {
             state.phase = "decelerating";
           }
           break;
         }
         case "decelerating": {
+          // Ball starts falling from wood track DOWN toward the number ring
           state.wheelRotation += state.wheelSpeed;
-          state.wheelSpeed *= 0.9985;
+          state.wheelSpeed *= 0.9988;
           state.ballAngle += state.ballSpeed;
-          // Ball fights to keep rolling — slow deceleration
-          state.ballSpeed *= 0.993;
-          // Ball slowly spirals inward
-          state.ballRadius -= 0.25;
+          state.ballSpeed *= 0.994;
 
-          // Tick sounds getting further apart as ball slows
+          // Ball spirals inward from wood to number ring edge
+          state.ballRadius -= 0.35;
+
+          // Tick sounds as ball scrapes across deflectors on the way down
           state.tickCooldown--;
           const diff = Math.abs(state.ballAngle - state.lastTickAngle);
-          if (diff > SEG_ANGLE * 0.6 && state.tickCooldown <= 0) {
+          if (diff > SEG_ANGLE * 0.5 && state.tickCooldown <= 0) {
             state.lastTickAngle = state.ballAngle;
-            state.tickCooldown = 3;
+            state.tickCooldown = 4;
             audioEngine.playBallTick();
           }
 
-          // Ball reaches the pocket ring
-          if (state.ballRadius <= NUM_RING_OUTER - 3) {
+          // Ball hits the top edge of the number ring — starts bouncing
+          if (state.ballRadius <= NUM_RING_OUTER + 2) {
             state.phase = "bouncing";
             state.bounceCount = 0;
+            state.ballRadius = NUM_RING_OUTER - 3;
             audioEngine.playBallBounce();
           }
           break;
         }
         case "bouncing": {
+          // Ball is now INSIDE the number ring, bouncing between pocket dividers
           state.wheelRotation += state.wheelSpeed;
-          state.wheelSpeed *= 0.9992;
-          state.ballAngle += state.ballSpeed * 0.35;
-          state.ballSpeed *= 0.96;
+          state.wheelSpeed *= 0.9993;
+          state.ballAngle += state.ballSpeed * 0.3;
+          state.ballSpeed *= 0.965;
           state.bounceCount++;
 
-          // Multiple realistic bounces — ball hops between pockets
-          if (state.bounceCount % 8 === 0 && state.bounceCount < 80) {
-            // Ball bounces up and comes back down
-            state.ballRadius += (Math.random() - 0.4) * 5;
-            // Keep ball within pocket area
+          // Ball bounces UP (back toward wood) and falls back down into pockets
+          if (state.bounceCount % 10 === 0 && state.bounceCount < 70) {
+            // Bounce up slightly then come back down
+            const bounceHeight = Math.max(3, 8 - state.bounceCount * 0.1);
+            state.ballRadius = (NUM_RING_OUTER + NUM_RING_INNER) / 2 +
+              (Math.random() - 0.3) * bounceHeight;
+            // Keep within pocket area
             state.ballRadius = Math.min(state.ballRadius, NUM_RING_OUTER - 2);
-            state.ballRadius = Math.max(state.ballRadius, NUM_RING_INNER + 5);
+            state.ballRadius = Math.max(state.ballRadius, NUM_RING_INNER + 4);
+            // Each bounce makes a sound
             audioEngine.playBallBounce();
+            // Ball also jumps sideways (skips pockets)
+            state.ballAngle += (Math.random() - 0.5) * SEG_ANGLE * 0.8;
+          } else {
+            // Between bounces, ball settling toward center of pocket ring
+            state.ballRadius += (BALL_POCKET - state.ballRadius) * 0.03;
           }
 
-          // Gradually settle
-          if (state.bounceCount > 80) {
+          // After enough bounces, ball finally settles into target pocket
+          if (state.bounceCount > 70) {
             state.phase = "settled";
             const targetIdx = WHEEL_NUMBERS.indexOf(state.targetNumber);
             const targetA = targetIdx * SEG_ANGLE + state.wheelRotation + SEG_ANGLE / 2;
             state.ballAngle = targetA;
-            state.ballRadius = (NUM_RING_OUTER + NUM_RING_INNER) / 2;
+            state.ballRadius = BALL_POCKET;
             audioEngine.playBallSettle();
           }
           break;
         }
         case "settled": {
+          // Ball is in the pocket, rotates with wheel as it slows to stop
           state.wheelRotation += state.wheelSpeed;
-          // Wheel keeps spinning gently even after ball settles
-          state.wheelSpeed *= 0.995;
+          state.wheelSpeed *= 0.994;
 
-          // Ball locked in pocket, rotates with wheel
+          // Ball locked in pocket, moves with wheel
           const targetIdx = WHEEL_NUMBERS.indexOf(state.targetNumber);
           const targetA = targetIdx * SEG_ANGLE + state.wheelRotation + SEG_ANGLE / 2;
-          state.ballAngle += (targetA - state.ballAngle) * 0.06;
-          state.ballRadius += ((NUM_RING_OUTER + NUM_RING_INNER) / 2 - state.ballRadius) * 0.05;
+          state.ballAngle += (targetA - state.ballAngle) * 0.08;
+          state.ballRadius += (BALL_POCKET - state.ballRadius) * 0.1;
 
-          if (state.wheelSpeed < 0.0008) {
+          if (state.wheelSpeed < 0.001) {
             state.showResult = true;
             if (!state.ballSettled) {
               state.ballSettled = true;
@@ -427,7 +443,7 @@ export default function RouletteWheel3D() {
 
     loop();
     return () => { cancelAnimationFrame(animationRef.current); };
-  }, [C, OUTER_R, WOOD_R, NUM_RING_OUTER, NUM_RING_INNER, CONE_R, BALL_TRACK, SIZE, SEGMENTS, SEG_ANGLE, spinComplete]);
+  }, [C, OUTER_R, WOOD_R, NUM_RING_OUTER, NUM_RING_INNER, CONE_R, BALL_TRACK, BALL_POCKET, SIZE, SEGMENTS, SEG_ANGLE, spinComplete]);
 
   return (
     <div className="flex-shrink-0">
