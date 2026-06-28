@@ -7,7 +7,6 @@ import {
   SpinResult,
   spinWheel,
   evaluateAllBets,
-  getNumberColor,
 } from "@/lib/roulette-engine";
 import {
   PlayerState,
@@ -20,6 +19,19 @@ import {
   claimRecovery,
   ECONOMY_CONFIG,
 } from "@/lib/economy";
+import {
+  BotPlayer,
+  ChatMessage,
+  createBotPlayers,
+  generateBotBets,
+  getCrupierMessage,
+  getCrupierResultMessage,
+  getBotBettingMessage,
+  getBotReactionMessage,
+  createSystemMessage,
+  createBotMessage,
+} from "@/lib/bot-crupier";
+import { audioEngine } from "@/lib/audio-engine";
 
 export type GamePhase = "betting" | "spinning" | "result";
 
@@ -33,17 +45,24 @@ interface GameState {
   lastResult: SpinResult | null;
   selectedChipValue: number;
 
+  // Chat & Bots
+  chatMessages: ChatMessage[];
+  botPlayers: BotPlayer[];
+  initialized: boolean;
+
   // Actions
+  initGame: () => void;
   placeBet: (bet: Bet) => boolean;
   removeBet: (index: number) => void;
   clearBets: () => void;
   spin: () => void;
-  finishSpin: (result: SpinResult) => void;
+  spinComplete: () => void;
   setChipValue: (value: number) => void;
   repeatLastBets: () => void;
   claimBonus: () => boolean;
   claimBankruptcyRecovery: () => boolean;
   resetGame: () => void;
+  addChatMessage: (msg: ChatMessage) => void;
 
   // Computed helpers
   getTotalBetAmount: () => number;
@@ -58,6 +77,24 @@ export const useGameStore = create<GameState>()(
       currentBets: [],
       lastResult: null,
       selectedChipValue: 100,
+      chatMessages: [],
+      botPlayers: [],
+      initialized: false,
+
+      initGame: () => {
+        const state = get();
+        if (state.initialized) return;
+
+        const bots = createBotPlayers(4);
+        const welcomeMsg = createSystemMessage("Mesa abierta. Bienvenidos al C8L Casino.");
+        const leonMsg = createBotMessage(bots[0], getCrupierMessage("welcome"));
+
+        set({
+          botPlayers: bots,
+          chatMessages: [welcomeMsg, leonMsg],
+          initialized: true,
+        });
+      },
 
       placeBet: (bet: Bet) => {
         const state = get();
@@ -66,7 +103,7 @@ export const useGameStore = create<GameState>()(
         const totalBets = state.getTotalBetAmount() + bet.amount;
         if (totalBets > state.player.balance) return false;
         if (bet.amount < ECONOMY_CONFIG.MIN_BET) return false;
-        if (totalBets > ECONOMY_CONFIG.MAX_BET) return false;
+        if (totalBets > ECONOMY_CONFIG.MAX_BET * 5) return false;
 
         set({ currentBets: [...state.currentBets, bet] });
         return true;
@@ -90,11 +127,34 @@ export const useGameStore = create<GameState>()(
         const state = get();
         if (!state.canSpin()) return;
 
+        audioEngine.init();
+
         const totalBet = state.getTotalBetAmount();
 
-        // Deduct bets from balance
+        // Bots place their bets
+        const updatedBots = state.botPlayers.map(bot => ({
+          ...bot,
+          currentBets: generateBotBets(bot, [50, 100, 500, 1000]),
+        }));
+
+        // Bot betting messages
+        const newMessages = [...state.chatMessages];
+        const randomBot = updatedBots[Math.floor(Math.random() * updatedBots.length)];
+        newMessages.push(createBotMessage(randomBot, getBotBettingMessage()));
+
+        // Crupier announcement
+        const leon = updatedBots.find(b => b.isHouse)!;
+        newMessages.push(createBotMessage(leon, getCrupierMessage("spinning")));
+
+        // Compute result now (animation will play, then spinComplete is called)
+        const resultNumber = spinWheel();
+        const spinResult = evaluateAllBets(state.currentBets, resultNumber);
+
         set({
           phase: "spinning",
+          lastResult: spinResult,
+          botPlayers: updatedBots,
+          chatMessages: newMessages.slice(-50), // Keep last 50 messages
           player: {
             ...state.player,
             balance: state.player.balance - totalBet,
@@ -102,30 +162,49 @@ export const useGameStore = create<GameState>()(
             spinsCount: state.player.spinsCount + 1,
           },
         });
-
-        // The actual spin result will be computed after animation
-        const result = spinWheel();
-        const spinResult = evaluateAllBets(state.currentBets, result);
-
-        // After a delay (animation), call finishSpin
-        setTimeout(() => {
-          get().finishSpin(spinResult);
-        }, 4000); // 4 seconds for spin animation
       },
 
-      finishSpin: (result: SpinResult) => {
+      spinComplete: () => {
+        // Called by RouletteWheel3D when animation finishes
         const state = get();
+        if (state.phase !== "spinning" || !state.lastResult) return;
+
+        const result = state.lastResult;
         const historyEntry: HistoryEntry = {
           number: result.number,
           color: result.color,
           timestamp: Date.now(),
         };
-
         const newHistory = [historyEntry, ...state.player.history].slice(0, 20);
+
+        // Chat messages for result
+        const newMessages = [...state.chatMessages];
+        const leon = state.botPlayers.find(b => b.isHouse)!;
+        newMessages.push(createBotMessage(leon, getCrupierResultMessage(result.number)));
+
+        // Bot reactions
+        state.botPlayers.forEach(bot => {
+          if (!bot.isHouse && Math.random() > 0.5) {
+            const botWon = bot.currentBets.some(b => b.numbers.includes(result.number));
+            newMessages.push(createBotMessage(bot, getBotReactionMessage(botWon)));
+          }
+        });
+
+        // Big win message
+        if (result.totalWin > 5000) {
+          newMessages.push(createSystemMessage(`🎉 GRAN GANANCIA: +${result.totalWin.toLocaleString()} fichas!`));
+          audioEngine.playWin();
+        } else if (result.totalWin > 0) {
+          audioEngine.playWin();
+        } else {
+          audioEngine.playLose();
+        }
+
+        audioEngine.playCrupierChime();
 
         set({
           phase: "result",
-          lastResult: result,
+          chatMessages: newMessages.slice(-50),
           player: {
             ...state.player,
             balance: state.player.balance + result.totalWin,
@@ -138,10 +217,10 @@ export const useGameStore = create<GameState>()(
           },
         });
 
-        // Auto-transition back to betting after 3 seconds
+        // Auto-transition back to betting
         setTimeout(() => {
           set({ phase: "betting", currentBets: [] });
-        }, 3000);
+        }, 4000);
       },
 
       setChipValue: (value: number) => {
@@ -165,6 +244,12 @@ export const useGameStore = create<GameState>()(
         const state = get();
         if (!canClaimDailyBonus(state.player)) return false;
         set({ player: claimDailyBonus(state.player) });
+        const leon = state.botPlayers.find(b => b.isHouse);
+        if (leon) {
+          set({
+            chatMessages: [...state.chatMessages, createBotMessage(leon, "Bono diario reclamado. A jugar!")],
+          });
+        }
         return true;
       },
 
@@ -181,7 +266,14 @@ export const useGameStore = create<GameState>()(
           phase: "betting",
           currentBets: [],
           lastResult: null,
+          chatMessages: [],
+          initialized: false,
         });
+      },
+
+      addChatMessage: (msg: ChatMessage) => {
+        const state = get();
+        set({ chatMessages: [...state.chatMessages, msg].slice(-50) });
       },
 
       getTotalBetAmount: () => {
@@ -199,10 +291,9 @@ export const useGameStore = create<GameState>()(
       },
     }),
     {
-      name: "c8l-ruleta-state",
+      name: "c8l-ruleta-v2",
       partialize: (state) => ({
         player: state.player,
-        lastResult: state.lastResult,
       }),
     }
   )

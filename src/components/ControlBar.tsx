@@ -2,14 +2,15 @@
 
 import { useGameStore } from "@/store/game-store";
 import { formatBalance, isBankrupt, canClaimDailyBonus } from "@/lib/economy";
+import { audioEngine } from "@/lib/audio-engine";
 
 const CHIP_VALUES = [50, 100, 500, 1000, 5000];
-const CHIP_COLORS: Record<number, string> = {
-  50: "bg-blue-600 border-blue-400",
-  100: "bg-green-600 border-green-400",
-  500: "bg-red-600 border-red-400",
-  1000: "bg-purple-600 border-purple-400",
-  5000: "bg-yellow-600 border-yellow-400",
+const CHIP_COLORS: Record<number, { bg: string; ring: string }> = {
+  50: { bg: "bg-blue-600", ring: "ring-blue-400" },
+  100: { bg: "bg-green-600", ring: "ring-green-400" },
+  500: { bg: "bg-red-600", ring: "ring-red-400" },
+  1000: { bg: "bg-purple-600", ring: "ring-purple-400" },
+  5000: { bg: "bg-yellow-500", ring: "ring-yellow-300" },
 };
 
 export default function ControlBar() {
@@ -33,114 +34,134 @@ export default function ControlBar() {
   const bankrupt = isBankrupt(player);
   const canBonus = canClaimDailyBonus(player);
 
+  const handleSpin = () => {
+    audioEngine.init();
+    spin();
+  };
+
   return (
     <div className="w-full">
       {/* Chip selector */}
-      <div className="flex items-center justify-center gap-2 mb-3">
-        {CHIP_VALUES.map((value) => (
-          <button
-            key={value}
-            onClick={() => setChipValue(value)}
-            className={`chip w-11 h-11 flex items-center justify-center
-                       text-white font-bold text-[10px] font-game border-2
-                       ${CHIP_COLORS[value]}
-                       ${selectedChipValue === value
-                         ? "ring-2 ring-casino-goldLight ring-offset-2 ring-offset-black scale-110"
-                         : "opacity-70"
-                       }`}
-          >
-            {value >= 1000 ? `${value / 1000}K` : value}
-          </button>
-        ))}
+      <div className="flex items-center justify-center gap-3 mb-3">
+        {CHIP_VALUES.map((value) => {
+          const colors = CHIP_COLORS[value];
+          const isSelected = selectedChipValue === value;
+          return (
+            <button
+              key={value}
+              onClick={() => setChipValue(value)}
+              className={`chip w-12 h-12 flex items-center justify-center
+                         text-white font-bold text-[10px] font-game border-[3px] border-white/40
+                         relative overflow-hidden
+                         ${colors.bg}
+                         ${isSelected ? `ring-2 ${colors.ring} ring-offset-2 ring-offset-black scale-115 shadow-gold` : "opacity-60 hover:opacity-80"}`}
+              style={{
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
+            >
+              {/* Chip pattern */}
+              <div className="absolute inset-1 rounded-full border border-dashed border-white/30" />
+              <span className="relative z-10">
+                {value >= 1000 ? `${value / 1000}K` : value}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Main control area */}
-      <div className="flex items-center justify-between gap-3 bg-casino-carbon/80 rounded-xl p-3 gold-border">
+      {/* Main control strip */}
+      <div className="flex items-center justify-between gap-4 bg-black/60 backdrop-blur-sm rounded-2xl p-4 gold-border">
         {/* Balance */}
-        <div className="flex flex-col items-center min-w-[100px]">
-          <span className="text-gray-400 font-game text-[8px] uppercase">Saldo</span>
-          <span className="text-casino-goldLight font-game text-lg font-bold">
+        <div className="flex flex-col items-center min-w-[110px]">
+          <span className="text-gray-500 font-game text-[9px] uppercase tracking-wider">Saldo</span>
+          <span className="text-casino-goldLight font-game text-xl font-bold">
             {formatBalance(player.balance)}
           </span>
         </div>
 
         {/* Total bet */}
-        <div className="flex flex-col items-center min-w-[100px]">
-          <span className="text-gray-400 font-game text-[8px] uppercase">Apuesta Total</span>
+        <div className="flex flex-col items-center min-w-[90px]">
+          <span className="text-gray-500 font-game text-[9px] uppercase tracking-wider">Apuesta</span>
           <span className="text-white font-game text-lg font-bold">
             {formatBalance(totalBet)}
           </span>
         </div>
 
-        {/* Spin button */}
+        {/* SPIN button */}
         <button
-          onClick={spin}
+          onClick={handleSpin}
           disabled={!canSpin()}
-          className={`px-8 py-3 rounded-full font-game text-lg font-bold uppercase
-                     transition-all duration-200
+          className={`relative px-10 py-4 rounded-full font-game text-xl font-bold uppercase
+                     overflow-hidden transition-all duration-300
                      ${canSpin()
-                       ? "bg-gradient-to-b from-green-500 to-green-700 text-white btn-glow"
-                       : "bg-gray-700 text-gray-500 cursor-not-allowed"
-                     }`}
+                       ? "bg-gradient-to-b from-green-400 to-green-700 text-white shadow-[0_0_30px_rgba(34,197,94,0.4)] hover:shadow-[0_0_50px_rgba(34,197,94,0.6)] hover:scale-105 active:scale-95"
+                       : "bg-gray-800 text-gray-600 cursor-not-allowed"}`}
         >
-          {phase === "spinning" ? "..." : "GIRAR"}
+          {/* Glow effect */}
+          {canSpin() && (
+            <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/10 pointer-events-none" />
+          )}
+          <span className="relative z-10">
+            {phase === "spinning" ? "⏳" : phase === "result" ? "✨" : "GIRAR"}
+          </span>
         </button>
 
-        {/* Repeat & Favorite */}
+        {/* Actions */}
         <div className="flex gap-2">
           <button
             onClick={repeatLastBets}
             disabled={phase !== "betting" || !lastResult}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg
-                       bg-casino-carbon border border-casino-gold/30
-                       text-casino-gold font-game text-[10px] uppercase
-                       hover:border-casino-gold/60 transition-colors
-                       disabled:opacity-30 disabled:cursor-not-allowed"
+            className="px-3 py-2 rounded-lg bg-black/50 border border-casino-gold/30
+                       text-casino-gold font-game text-[9px] uppercase
+                       hover:border-casino-gold/60 hover:bg-black/70 transition-all
+                       disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Repetir ultima apuesta"
           >
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            Repetir
+            🔄 Repetir
           </button>
 
           <button
             onClick={clearBets}
             disabled={phase !== "betting" || currentBets.length === 0}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg
-                       bg-casino-carbon border border-red-900/30
-                       text-red-400 font-game text-[10px] uppercase
-                       hover:border-red-700/60 transition-colors
-                       disabled:opacity-30 disabled:cursor-not-allowed"
+            className="px-3 py-2 rounded-lg bg-black/50 border border-red-900/30
+                       text-red-400 font-game text-[9px] uppercase
+                       hover:border-red-700/60 hover:bg-black/70 transition-all
+                       disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Borrar apuestas"
           >
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            Borrar
+            ✕ Borrar
           </button>
+        </div>
+
+        {/* Stats */}
+        <div className="flex flex-col items-center min-w-[80px]">
+          <span className="text-gray-500 font-game text-[9px] uppercase tracking-wider">Giros</span>
+          <span className="text-gray-300 font-game text-lg">{player.spinsCount}</span>
         </div>
       </div>
 
-      {/* Bankruptcy / Bonus panel */}
-      {(bankrupt || canBonus) && (
-        <div className="mt-2 flex items-center justify-center gap-3">
+      {/* Bonus/Recovery */}
+      {(bankrupt || canBonus) && phase === "betting" && (
+        <div className="mt-3 flex items-center justify-center gap-3">
           {bankrupt && (
             <button
               onClick={claimBankruptcyRecovery}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-600 to-amber-800
-                         text-white font-game text-xs uppercase
-                         hover:from-amber-500 hover:to-amber-700 transition-all"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-800
+                         text-white font-game text-xs uppercase shadow-lg
+                         hover:from-amber-500 hover:to-amber-700 hover:scale-105 transition-all
+                         animate-pulse"
             >
-              Reclamar Recuperacion
+              💰 Reclamar Recuperacion (+10K)
             </button>
           )}
-          {canBonus && (
+          {canBonus && !bankrupt && (
             <button
               onClick={claimBonus}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-green-800
-                         text-white font-game text-xs uppercase
-                         hover:from-green-500 hover:to-green-700 transition-all"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-green-800
+                         text-white font-game text-xs uppercase shadow-lg
+                         hover:from-green-500 hover:to-green-700 hover:scale-105 transition-all"
             >
-              Bono Diario +25K
+              🎁 Bono Diario +25K
             </button>
           )}
         </div>
