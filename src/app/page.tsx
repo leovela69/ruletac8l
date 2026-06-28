@@ -56,14 +56,32 @@ export default function Home() {
       {/* Main game area - horizontal layout: Table LEFT, Wheel RIGHT */}
       <div className={`flex-1 flex items-center justify-center p-4 gap-8 pl-[240px] transition-all duration-300
         ${chatOpen ? "pr-[16px]" : "pr-4"}`}>
-        {/* LEFT: Betting Table + Controls */}
-        <div className="flex flex-col gap-3 max-w-[540px]">
-          <BettingTable3D />
-          <ControlBar />
-        </div>
+        {/* Tapete negro con borde dorado - solo envuelve mesa + ruleta */}
+        <div className="relative rounded-2xl p-6
+                        bg-gradient-to-b from-[#1a1a1a] via-[#0d0d0d] to-[#111111]
+                        border-2 border-amber-500/50
+                        shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_60px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,215,0,0.1)]">
+          {/* Inner gold accent line */}
+          <div className="absolute inset-[6px] rounded-xl border border-amber-600/20 pointer-events-none" />
 
-        {/* RIGHT: Roulette Wheel */}
-        <RouletteWheel3D />
+          {/* Corner ornaments */}
+          <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-amber-500/40 rounded-tl-lg" />
+          <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-amber-500/40 rounded-tr-lg" />
+          <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-amber-500/40 rounded-bl-lg" />
+          <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-amber-500/40 rounded-br-lg" />
+
+          {/* Content: Table + Wheel */}
+          <div className="flex items-center gap-8">
+            {/* LEFT: Betting Table + Controls */}
+            <div className="flex flex-col gap-3 max-w-[540px]">
+              <BettingTable3D />
+              <ControlBar />
+            </div>
+
+            {/* RIGHT: Roulette Wheel */}
+            <RouletteWheel3D />
+          </div>
+        </div>
       </div>
 
       {/* Chat Panel (right sidebar) - conditionally rendered */}
