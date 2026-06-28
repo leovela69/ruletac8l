@@ -5,13 +5,6 @@ import { formatBalance, isBankrupt, canClaimDailyBonus } from "@/lib/economy";
 import { audioEngine } from "@/lib/audio-engine";
 
 const CHIP_VALUES = [50, 100, 500, 1000, 5000];
-const CHIP_COLORS: Record<number, { bg: string; ring: string }> = {
-  50: { bg: "bg-blue-600", ring: "ring-blue-400" },
-  100: { bg: "bg-green-600", ring: "ring-green-400" },
-  500: { bg: "bg-red-600", ring: "ring-red-400" },
-  1000: { bg: "bg-purple-600", ring: "ring-purple-400" },
-  5000: { bg: "bg-yellow-500", ring: "ring-yellow-300" },
-};
 
 export default function ControlBar() {
   const {
@@ -39,71 +32,57 @@ export default function ControlBar() {
     spin();
   };
 
+  // Turquoise chip selector style matching the reference
+  const getChipStyle = (value: number) => {
+    const isSelected = selectedChipValue === value;
+    return `chip w-11 h-11 flex items-center justify-center text-white font-bold text-[9px]
+            bg-teal-500 border-[3px] border-dashed border-sky-300
+            ${isSelected ? "ring-2 ring-white ring-offset-1 ring-offset-black scale-115 brightness-110" : "opacity-60"}`;
+  };
+
   return (
     <div className="w-full">
       {/* Chip selector */}
-      <div className="flex items-center justify-center gap-3 mb-3">
-        {CHIP_VALUES.map((value) => {
-          const colors = CHIP_COLORS[value];
-          const isSelected = selectedChipValue === value;
-          return (
-            <button
-              key={value}
-              onClick={() => setChipValue(value)}
-              className={`chip w-12 h-12 flex items-center justify-center
-                         text-white font-bold text-[10px] font-game border-[3px] border-white/40
-                         relative overflow-hidden
-                         ${colors.bg}
-                         ${isSelected ? `ring-2 ${colors.ring} ring-offset-2 ring-offset-black scale-115 shadow-gold` : "opacity-60 hover:opacity-80"}`}
-              style={{
-                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-              }}
-            >
-              {/* Chip pattern */}
-              <div className="absolute inset-1 rounded-full border border-dashed border-white/30" />
-              <span className="relative z-10">
-                {value >= 1000 ? `${value / 1000}K` : value}
-              </span>
-            </button>
-          );
-        })}
+      <div className="flex items-center justify-center gap-2 mb-3">
+        {CHIP_VALUES.map((value) => (
+          <button
+            key={value}
+            onClick={() => setChipValue(value)}
+            className={getChipStyle(value)}
+          >
+            {value >= 1000 ? `${value / 1000}K` : value}
+          </button>
+        ))}
       </div>
 
-      {/* Main control strip */}
-      <div className="flex items-center justify-between gap-4 bg-black/60 backdrop-blur-sm rounded-2xl p-4 gold-border">
+      {/* Control strip */}
+      <div className="flex items-center justify-between gap-3 bg-[#1a1a1a] rounded-lg p-3 border border-white/10">
         {/* Balance */}
-        <div className="flex flex-col items-center min-w-[110px]">
-          <span className="text-gray-500 font-game text-[9px] uppercase tracking-wider">Saldo</span>
-          <span className="text-casino-goldLight font-game text-xl font-bold">
+        <div className="flex flex-col items-center min-w-[90px]">
+          <span className="text-gray-500 text-[9px] font-mono uppercase">Balance</span>
+          <span className="text-white font-mono text-base font-bold">
             {formatBalance(player.balance)}
           </span>
         </div>
 
         {/* Total bet */}
-        <div className="flex flex-col items-center min-w-[90px]">
-          <span className="text-gray-500 font-game text-[9px] uppercase tracking-wider">Apuesta</span>
-          <span className="text-white font-game text-lg font-bold">
+        <div className="flex flex-col items-center min-w-[70px]">
+          <span className="text-gray-500 text-[9px] font-mono uppercase">Bet</span>
+          <span className="text-teal-400 font-mono text-base font-bold">
             {formatBalance(totalBet)}
           </span>
         </div>
 
-        {/* SPIN button */}
+        {/* SPIN */}
         <button
           onClick={handleSpin}
           disabled={!canSpin()}
-          className={`relative px-10 py-4 rounded-full font-game text-xl font-bold uppercase
-                     overflow-hidden transition-all duration-300
+          className={`px-8 py-3 rounded-full font-bold text-lg uppercase transition-all
                      ${canSpin()
-                       ? "bg-gradient-to-b from-green-400 to-green-700 text-white shadow-[0_0_30px_rgba(34,197,94,0.4)] hover:shadow-[0_0_50px_rgba(34,197,94,0.6)] hover:scale-105 active:scale-95"
+                       ? "bg-teal-500 text-white hover:bg-teal-400 active:scale-95 shadow-[0_0_15px_rgba(45,212,191,0.3)]"
                        : "bg-gray-800 text-gray-600 cursor-not-allowed"}`}
         >
-          {/* Glow effect */}
-          {canSpin() && (
-            <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/10 pointer-events-none" />
-          )}
-          <span className="relative z-10">
-            {phase === "spinning" ? "⏳" : phase === "result" ? "✨" : "GIRAR"}
-          </span>
+          {phase === "spinning" ? "..." : phase === "result" ? "OK" : "SPIN"}
         </button>
 
         {/* Actions */}
@@ -111,57 +90,45 @@ export default function ControlBar() {
           <button
             onClick={repeatLastBets}
             disabled={phase !== "betting" || !lastResult}
-            className="px-3 py-2 rounded-lg bg-black/50 border border-casino-gold/30
-                       text-casino-gold font-game text-[9px] uppercase
-                       hover:border-casino-gold/60 hover:bg-black/70 transition-all
+            className="px-3 py-2 rounded bg-[#2a2a2a] border border-white/10
+                       text-white text-[10px] font-mono
+                       hover:bg-[#333] transition-colors
                        disabled:opacity-20 disabled:cursor-not-allowed"
-            title="Repetir ultima apuesta"
           >
-            🔄 Repetir
+            REPEAT
           </button>
-
           <button
             onClick={clearBets}
             disabled={phase !== "betting" || currentBets.length === 0}
-            className="px-3 py-2 rounded-lg bg-black/50 border border-red-900/30
-                       text-red-400 font-game text-[9px] uppercase
-                       hover:border-red-700/60 hover:bg-black/70 transition-all
+            className="px-3 py-2 rounded bg-[#2a2a2a] border border-red-900/30
+                       text-red-400 text-[10px] font-mono
+                       hover:bg-[#333] transition-colors
                        disabled:opacity-20 disabled:cursor-not-allowed"
-            title="Borrar apuestas"
           >
-            ✕ Borrar
+            CLEAR
           </button>
-        </div>
-
-        {/* Stats */}
-        <div className="flex flex-col items-center min-w-[80px]">
-          <span className="text-gray-500 font-game text-[9px] uppercase tracking-wider">Giros</span>
-          <span className="text-gray-300 font-game text-lg">{player.spinsCount}</span>
         </div>
       </div>
 
       {/* Bonus/Recovery */}
       {(bankrupt || canBonus) && phase === "betting" && (
-        <div className="mt-3 flex items-center justify-center gap-3">
+        <div className="mt-2 flex items-center justify-center gap-3">
           {bankrupt && (
             <button
               onClick={claimBankruptcyRecovery}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-800
-                         text-white font-game text-xs uppercase shadow-lg
-                         hover:from-amber-500 hover:to-amber-700 hover:scale-105 transition-all
-                         animate-pulse"
+              className="px-4 py-2 rounded bg-amber-700 text-white text-xs font-mono
+                         hover:bg-amber-600 transition-colors"
             >
-              💰 Reclamar Recuperacion (+10K)
+              RECOVERY +10K
             </button>
           )}
           {canBonus && !bankrupt && (
             <button
               onClick={claimBonus}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-green-800
-                         text-white font-game text-xs uppercase shadow-lg
-                         hover:from-green-500 hover:to-green-700 hover:scale-105 transition-all"
+              className="px-4 py-2 rounded bg-teal-700 text-white text-xs font-mono
+                         hover:bg-teal-600 transition-colors"
             >
-              🎁 Bono Diario +25K
+              DAILY BONUS +25K
             </button>
           )}
         </div>

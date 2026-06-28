@@ -11,46 +11,48 @@ export default function RouletteWheel3D() {
   const stateRef = useRef({
     wheelRotation: 0,
     wheelSpeed: 0,
-    ballAngle: 0,
+    ballAngle: Math.random() * Math.PI * 2,
     ballSpeed: 0,
     ballRadius: 0,
-    ballBouncing: false,
-    ballSettled: false,
     phase: "idle" as "idle" | "spinning" | "decelerating" | "bouncing" | "settled",
     targetNumber: -1,
     startTime: 0,
     lastTickAngle: 0,
     bounceCount: 0,
+    ballSettled: false,
+    showResult: false,
   });
 
   const { phase, lastResult, spinComplete } = useGameStore();
 
-  const CANVAS_SIZE = 380;
-  const CENTER = CANVAS_SIZE / 2;
-  const OUTER_RADIUS = CENTER - 15;
-  const POCKET_RADIUS = OUTER_RADIUS - 45;
-  const BALL_TRACK_RADIUS = OUTER_RADIUS - 8;
-  const NUM_SEGMENTS = 37;
-  const SEGMENT_ANGLE = (2 * Math.PI) / NUM_SEGMENTS;
+  const SIZE = 400;
+  const C = SIZE / 2;
+  const OUTER_R = C - 12;
+  const WOOD_R = OUTER_R - 8;
+  const NUM_RING_OUTER = WOOD_R - 20;
+  const NUM_RING_INNER = NUM_RING_OUTER - 36;
+  const CONE_R = NUM_RING_INNER - 8;
+  const BALL_TRACK = WOOD_R - 10;
+  const SEGMENTS = 37;
+  const SEG_ANGLE = (2 * Math.PI) / SEGMENTS;
+
 
   const startSpin = useCallback((targetNum: number) => {
     const state = stateRef.current;
     state.phase = "spinning";
-    state.wheelSpeed = 0.08 + Math.random() * 0.02;
-    state.ballSpeed = -(0.12 + Math.random() * 0.03);
-    state.ballRadius = BALL_TRACK_RADIUS;
-    state.ballBouncing = false;
-    state.ballSettled = false;
+    state.wheelSpeed = 0.06 + Math.random() * 0.02;
+    state.ballSpeed = -(0.10 + Math.random() * 0.03);
+    state.ballRadius = BALL_TRACK;
     state.targetNumber = targetNum;
     state.startTime = performance.now();
     state.bounceCount = 0;
+    state.ballSettled = false;
+    state.showResult = false;
     state.lastTickAngle = state.ballAngle;
-
     audioEngine.init();
-    audioEngine.playSpinning(5);
-  }, [BALL_TRACK_RADIUS]);
+    audioEngine.playSpinning(5.5);
+  }, [BALL_TRACK]);
 
-  // React to game phase changes
   useEffect(() => {
     if (phase === "spinning" && lastResult) {
       startSpin(lastResult.number);
@@ -62,222 +64,271 @@ export default function RouletteWheel3D() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
 
-    function drawWheel() {
-      const state = stateRef.current;
-      ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-      // === OUTER RIM (3D effect with gradient) ===
-      const rimGrad = ctx.createRadialGradient(
-        CENTER - 20, CENTER - 20, OUTER_RADIUS - 10,
-        CENTER, CENTER, OUTER_RADIUS + 12
-      );
-      rimGrad.addColorStop(0, "#8b6914");
-      rimGrad.addColorStop(0.3, "#c9a435");
-      rimGrad.addColorStop(0.5, "#e6c84d");
-      rimGrad.addColorStop(0.7, "#c9a435");
-      rimGrad.addColorStop(1, "#4a3508");
-
+    function drawWoodRing(ctx: CanvasRenderingContext2D) {
+      // Outer metallic brass ring
+      const brassGrad = ctx.createRadialGradient(C, C, OUTER_R - 10, C, C, OUTER_R);
+      brassGrad.addColorStop(0, "#d4a843");
+      brassGrad.addColorStop(0.3, "#f0d060");
+      brassGrad.addColorStop(0.6, "#c49a30");
+      brassGrad.addColorStop(1, "#8b6914");
       ctx.beginPath();
-      ctx.arc(CENTER, CENTER, OUTER_RADIUS + 10, 0, Math.PI * 2);
-      ctx.fillStyle = rimGrad;
+      ctx.arc(C, C, OUTER_R, 0, Math.PI * 2);
+      ctx.fillStyle = brassGrad;
       ctx.fill();
 
-      // Inner shadow for 3D depth
+      // Wood ring (pine/light wood with vertical grain)
+      const woodGrad = ctx.createRadialGradient(C, C, NUM_RING_OUTER + 2, C, C, WOOD_R);
+      woodGrad.addColorStop(0, "#c8a050");
+      woodGrad.addColorStop(0.3, "#dbb56a");
+      woodGrad.addColorStop(0.5, "#c49a40");
+      woodGrad.addColorStop(0.7, "#b8903a");
+      woodGrad.addColorStop(1, "#a07828");
       ctx.beginPath();
-      ctx.arc(CENTER, CENTER, OUTER_RADIUS + 2, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(0,0,0,0.5)";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // === BALL TRACK (chrome ring) ===
-      ctx.beginPath();
-      ctx.arc(CENTER, CENTER, OUTER_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = "#2a2a2a";
-      ctx.fill();
-
-      // Ball track groove
-      const trackGrad = ctx.createRadialGradient(
-        CENTER, CENTER, BALL_TRACK_RADIUS - 6,
-        CENTER, CENTER, BALL_TRACK_RADIUS + 6
-      );
-      trackGrad.addColorStop(0, "#1a1a1a");
-      trackGrad.addColorStop(0.3, "#3a3a3a");
-      trackGrad.addColorStop(0.5, "#555");
-      trackGrad.addColorStop(0.7, "#3a3a3a");
-      trackGrad.addColorStop(1, "#1a1a1a");
-
-      ctx.beginPath();
-      ctx.arc(CENTER, CENTER, BALL_TRACK_RADIUS + 5, 0, Math.PI * 2);
-      ctx.arc(CENTER, CENTER, BALL_TRACK_RADIUS - 5, 0, Math.PI * 2);
-      ctx.fillStyle = trackGrad;
+      ctx.arc(C, C, WOOD_R, 0, Math.PI * 2);
+      ctx.arc(C, C, NUM_RING_OUTER + 2, 0, Math.PI * 2);
+      ctx.fillStyle = woodGrad;
       ctx.fill("evenodd");
 
-      // === NUMBER WHEEL (rotates) ===
-      ctx.save();
-      ctx.translate(CENTER, CENTER);
-      ctx.rotate(state.wheelRotation);
-
-      // Wheel base
-      ctx.beginPath();
-      ctx.arc(0, 0, POCKET_RADIUS + 30, 0, Math.PI * 2);
-      ctx.fillStyle = "#1a1a1a";
-      ctx.fill();
-
-      // Draw segments
-      for (let i = 0; i < NUM_SEGMENTS; i++) {
-        const num = WHEEL_NUMBERS[i];
-        const color = getNumberColor(num);
-        const startA = i * SEGMENT_ANGLE - SEGMENT_ANGLE / 2;
-        const endA = startA + SEGMENT_ANGLE;
-
-        // Pocket color
+      // Wood grain lines
+      for (let i = 0; i < 60; i++) {
+        const angle = (i / 60) * Math.PI * 2;
+        const r1 = NUM_RING_OUTER + 4;
+        const r2 = WOOD_R - 2;
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, POCKET_RADIUS + 28, startA, endA);
-        ctx.closePath();
-
-        if (color === "red") {
-          const g = ctx.createRadialGradient(0, 0, POCKET_RADIUS - 10, 0, 0, POCKET_RADIUS + 28);
-          g.addColorStop(0, "#8b1a1a");
-          g.addColorStop(1, "#c62828");
-          ctx.fillStyle = g;
-        } else if (color === "black") {
-          const g = ctx.createRadialGradient(0, 0, POCKET_RADIUS - 10, 0, 0, POCKET_RADIUS + 28);
-          g.addColorStop(0, "#111");
-          g.addColorStop(1, "#333");
-          ctx.fillStyle = g;
-        } else {
-          const g = ctx.createRadialGradient(0, 0, POCKET_RADIUS - 10, 0, 0, POCKET_RADIUS + 28);
-          g.addColorStop(0, "#1b5e20");
-          g.addColorStop(1, "#2e7d32");
-          ctx.fillStyle = g;
-        }
-        ctx.fill();
-
-        // Divider (metal separator)
-        ctx.beginPath();
-        ctx.moveTo(
-          Math.cos(startA) * (POCKET_RADIUS + 5),
-          Math.sin(startA) * (POCKET_RADIUS + 5)
-        );
-        ctx.lineTo(
-          Math.cos(startA) * (POCKET_RADIUS + 28),
-          Math.sin(startA) * (POCKET_RADIUS + 28)
-        );
-        ctx.strokeStyle = "#c9a435";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Number
-        const textAngle = startA + SEGMENT_ANGLE / 2;
-        const textR = POCKET_RADIUS + 16;
-        ctx.save();
-        ctx.rotate(textAngle);
-        ctx.translate(textR, 0);
-        ctx.rotate(Math.PI / 2);
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 11px Georgia, serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.shadowColor = "rgba(0,0,0,0.8)";
-        ctx.shadowBlur = 2;
-        ctx.fillText(num.toString(), 0, 0);
-        ctx.shadowBlur = 0;
-        ctx.restore();
-      }
-
-      // Inner cone (3D golden center)
-      const coneGrad = ctx.createRadialGradient(
-        -10, -10, 0, 0, 0, POCKET_RADIUS
-      );
-      coneGrad.addColorStop(0, "#e6c84d");
-      coneGrad.addColorStop(0.2, "#c9a435");
-      coneGrad.addColorStop(0.5, "#8b6914");
-      coneGrad.addColorStop(0.8, "#4a3508");
-      coneGrad.addColorStop(1, "#2a2004");
-
-      ctx.beginPath();
-      ctx.arc(0, 0, POCKET_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = coneGrad;
-      ctx.fill();
-
-      // Cone ridges
-      for (let i = 0; i < 8; i++) {
-        const angle = (i / 8) * Math.PI * 2;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(
-          Math.cos(angle) * POCKET_RADIUS * 0.8,
-          Math.sin(angle) * POCKET_RADIUS * 0.8
-        );
-        ctx.strokeStyle = "rgba(201, 164, 53, 0.3)";
+        ctx.moveTo(C + Math.cos(angle) * r1, C + Math.sin(angle) * r1);
+        ctx.lineTo(C + Math.cos(angle) * r2, C + Math.sin(angle) * r2);
+        ctx.strokeStyle = "rgba(100, 60, 20, 0.15)";
         ctx.lineWidth = 1;
         ctx.stroke();
       }
 
-      // Center jewel
-      const jewelGrad = ctx.createRadialGradient(-3, -3, 0, 0, 0, 15);
-      jewelGrad.addColorStop(0, "#fff");
-      jewelGrad.addColorStop(0.3, "#e6c84d");
-      jewelGrad.addColorStop(0.7, "#c9a435");
-      jewelGrad.addColorStop(1, "#8b6914");
-
-      ctx.beginPath();
-      ctx.arc(0, 0, 15, 0, Math.PI * 2);
-      ctx.fillStyle = jewelGrad;
-      ctx.fill();
-      ctx.strokeStyle = "#4a3508";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.restore(); // End wheel rotation
-
-      // === BALL ===
-      if (state.phase !== "idle") {
-        const ballX = CENTER + Math.cos(state.ballAngle) * state.ballRadius;
-        const ballY = CENTER + Math.sin(state.ballAngle) * state.ballRadius;
-
-        // Ball shadow
+      // Diamond deflectors on wood ring
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const dx = C + Math.cos(angle) * (NUM_RING_OUTER + 14);
+        const dy = C + Math.sin(angle) * (NUM_RING_OUTER + 14);
+        ctx.save();
+        ctx.translate(dx, dy);
+        ctx.rotate(angle);
+        // Diamond shape
         ctx.beginPath();
-        ctx.arc(ballX + 3, ballY + 3, 7, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.moveTo(0, -5);
+        ctx.lineTo(3.5, 0);
+        ctx.moveTo(0, -5);
+        ctx.lineTo(-3.5, 0);
+        ctx.lineTo(0, 5);
+        ctx.lineTo(3.5, 0);
+        ctx.closePath();
+        const dGrad = ctx.createLinearGradient(-4, -5, 4, 5);
+        dGrad.addColorStop(0, "#f0d060");
+        dGrad.addColorStop(0.5, "#c49a30");
+        dGrad.addColorStop(1, "#8b6914");
+        ctx.fillStyle = dGrad;
         ctx.fill();
-
-        // Ball (3D metallic sphere)
-        const ballGrad = ctx.createRadialGradient(
-          ballX - 3, ballY - 3, 1,
-          ballX, ballY, 7
-        );
-        ballGrad.addColorStop(0, "#ffffff");
-        ballGrad.addColorStop(0.2, "#f5f5f5");
-        ballGrad.addColorStop(0.5, "#ddd");
-        ballGrad.addColorStop(0.8, "#aaa");
-        ballGrad.addColorStop(1, "#666");
-
-        ctx.beginPath();
-        ctx.arc(ballX, ballY, 7, 0, Math.PI * 2);
-        ctx.fillStyle = ballGrad;
-        ctx.fill();
-
-        // Ball highlight
-        ctx.beginPath();
-        ctx.arc(ballX - 2, ballY - 2, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.8)";
-        ctx.fill();
+        ctx.strokeStyle = "#6b4e10";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        ctx.restore();
       }
 
-      // === 3D PERSPECTIVE OVERLAY (top reflection) ===
-      const reflGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_SIZE);
-      reflGrad.addColorStop(0, "rgba(255,255,255,0.06)");
-      reflGrad.addColorStop(0.3, "rgba(255,255,255,0.02)");
-      reflGrad.addColorStop(0.5, "rgba(0,0,0,0)");
-      reflGrad.addColorStop(1, "rgba(0,0,0,0.1)");
-
+      // Inner brass ring (between wood and number crown)
       ctx.beginPath();
-      ctx.arc(CENTER, CENTER, OUTER_RADIUS + 10, 0, Math.PI * 2);
-      ctx.fillStyle = reflGrad;
+      ctx.arc(C, C, NUM_RING_OUTER + 2, 0, Math.PI * 2);
+      ctx.strokeStyle = "#c49a30";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+
+    function drawNumberCrown(ctx: CanvasRenderingContext2D, rotation: number) {
+      // Black number ring background
+      ctx.beginPath();
+      ctx.arc(C, C, NUM_RING_OUTER, 0, Math.PI * 2);
+      ctx.arc(C, C, NUM_RING_INNER, 0, Math.PI * 2);
+      ctx.fillStyle = "#111";
+      ctx.fill("evenodd");
+
+      // Draw colored segments with numbers
+      for (let i = 0; i < SEGMENTS; i++) {
+        const num = WHEEL_NUMBERS[i];
+        const color = getNumberColor(num);
+        const startA = rotation + i * SEG_ANGLE;
+        const endA = startA + SEG_ANGLE;
+        const midA = startA + SEG_ANGLE / 2;
+
+        // Colored pocket
+        ctx.beginPath();
+        ctx.arc(C, C, NUM_RING_OUTER - 1, startA, endA);
+        ctx.arc(C, C, NUM_RING_INNER + 1, endA, startA, true);
+        ctx.closePath();
+
+        if (color === "red") ctx.fillStyle = "#c0392b";
+        else if (color === "black") ctx.fillStyle = "#1a1a2e";
+        else ctx.fillStyle = "#27ae60";
+        ctx.fill();
+
+        // Gold divider line
+        ctx.beginPath();
+        ctx.moveTo(
+          C + Math.cos(startA) * (NUM_RING_INNER + 1),
+          C + Math.sin(startA) * (NUM_RING_INNER + 1)
+        );
+        ctx.lineTo(
+          C + Math.cos(startA) * (NUM_RING_OUTER - 1),
+          C + Math.sin(startA) * (NUM_RING_OUTER - 1)
+        );
+        ctx.strokeStyle = "rgba(196, 154, 48, 0.6)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Number text (radial orientation)
+        const textR = (NUM_RING_OUTER + NUM_RING_INNER) / 2;
+        const tx = C + Math.cos(midA) * textR;
+        const ty = C + Math.sin(midA) * textR;
+        ctx.save();
+        ctx.translate(tx, ty);
+        ctx.rotate(midA + Math.PI / 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 11px Arial, Helvetica, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(num.toString(), 0, 0);
+        ctx.restore();
+      }
+
+      // Inner brass ring
+      ctx.beginPath();
+      ctx.arc(C, C, NUM_RING_INNER, 0, Math.PI * 2);
+      ctx.strokeStyle = "#c49a30";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+
+    function drawConeAndTurret(ctx: CanvasRenderingContext2D) {
+      // Dark wood cone center
+      const coneGrad = ctx.createRadialGradient(C - 10, C - 10, 0, C, C, CONE_R);
+      coneGrad.addColorStop(0, "#8b6530");
+      coneGrad.addColorStop(0.3, "#6b4520");
+      coneGrad.addColorStop(0.7, "#4a2f15");
+      coneGrad.addColorStop(1, "#2a1a0a");
+      ctx.beginPath();
+      ctx.arc(C, C, CONE_R, 0, Math.PI * 2);
+      ctx.fillStyle = coneGrad;
+      ctx.fill();
+
+      // Concentric wood rings on cone
+      for (let r = 15; r < CONE_R; r += 12) {
+        ctx.beginPath();
+        ctx.arc(C, C, r, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(139, 101, 48, ${0.2 + (r / CONE_R) * 0.2})`;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+
+      // Turret cross (4 arms with golden spheres)
+      const armLength = 30;
+      const arms = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+      
+      arms.forEach((angle) => {
+        const x1 = C;
+        const y1 = C;
+        const x2 = C + Math.cos(angle) * armLength;
+        const y2 = C + Math.sin(angle) * armLength;
+
+        // Arm
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = "#c49a30";
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.strokeStyle = "#f0d060";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Sphere at tip
+        const sphereGrad = ctx.createRadialGradient(
+          x2 - 2, y2 - 2, 0, x2, y2, 6
+        );
+        sphereGrad.addColorStop(0, "#f0d060");
+        sphereGrad.addColorStop(0.4, "#c49a30");
+        sphereGrad.addColorStop(0.8, "#8b6914");
+        sphereGrad.addColorStop(1, "#5a4510");
+        ctx.beginPath();
+        ctx.arc(x2, y2, 6, 0, Math.PI * 2);
+        ctx.fillStyle = sphereGrad;
+        ctx.fill();
+        ctx.strokeStyle = "#5a4510";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+
+      // Center sphere (bigger)
+      const centerGrad = ctx.createRadialGradient(C - 3, C - 3, 0, C, C, 10);
+      centerGrad.addColorStop(0, "#f5e080");
+      centerGrad.addColorStop(0.4, "#d4a843");
+      centerGrad.addColorStop(0.8, "#8b6914");
+      centerGrad.addColorStop(1, "#5a4510");
+      ctx.beginPath();
+      ctx.arc(C, C, 10, 0, Math.PI * 2);
+      ctx.fillStyle = centerGrad;
+      ctx.fill();
+      ctx.strokeStyle = "#5a4510";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+
+    function drawBall(ctx: CanvasRenderingContext2D, angle: number, radius: number) {
+      const bx = C + Math.cos(angle) * radius;
+      const by = C + Math.sin(angle) * radius;
+
+      // Ball shadow
+      ctx.beginPath();
+      ctx.arc(bx + 2, by + 2, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.fill();
+
+      // Ball body (flat gray with single highlight)
+      ctx.beginPath();
+      ctx.arc(bx, by, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "#bbb";
+      ctx.fill();
+      ctx.strokeStyle = "#888";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Highlight spot (top-left)
+      ctx.beginPath();
+      ctx.arc(bx - 2, by - 2, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
       ctx.fill();
     }
+
+    function drawWinningNumber(ctx: CanvasRenderingContext2D, num: number) {
+      // Giant fuchsia number in center
+      ctx.save();
+      ctx.font = "bold 72px Arial, Helvetica, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // Black stroke
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 6;
+      ctx.strokeText(num.toString(), C, C);
+
+      // Fuchsia fill
+      ctx.fillStyle = "#ff1493";
+      ctx.fillText(num.toString(), C, C);
+
+      // Bright highlight
+      ctx.fillStyle = "rgba(255, 100, 200, 0.3)";
+      ctx.fillText(num.toString(), C - 1, C - 1);
+      ctx.restore();
+    }
+
 
     function updatePhysics() {
       const state = stateRef.current;
@@ -285,114 +336,106 @@ export default function RouletteWheel3D() {
 
       switch (state.phase) {
         case "spinning": {
-          // Wheel spins, ball rolls opposite direction
           state.wheelRotation += state.wheelSpeed;
           state.ballAngle += state.ballSpeed;
-          state.ballSpeed *= 0.997; // Slow down gradually
-
-          // Ball tick sounds when passing dividers
-          const angleDiff = Math.abs(state.ballAngle - state.lastTickAngle);
-          if (angleDiff > SEGMENT_ANGLE) {
-            state.lastTickAngle = state.ballAngle;
-            if (Math.random() > 0.6) audioEngine.playBallTick();
-          }
-
-          // Wheel decelerates
+          state.ballSpeed *= 0.997;
           state.wheelSpeed *= 0.999;
 
-          // After ~2.5s, ball starts falling inward
-          if (elapsed > 2.5) {
+          const diff = Math.abs(state.ballAngle - state.lastTickAngle);
+          if (diff > SEG_ANGLE) {
+            state.lastTickAngle = state.ballAngle;
+            if (Math.random() > 0.5) audioEngine.playBallTick();
+          }
+
+          if (elapsed > 2.8) {
             state.phase = "decelerating";
           }
           break;
         }
-
         case "decelerating": {
           state.wheelRotation += state.wheelSpeed;
-          state.wheelSpeed *= 0.995;
+          state.wheelSpeed *= 0.996;
           state.ballAngle += state.ballSpeed;
-          state.ballSpeed *= 0.985;
+          state.ballSpeed *= 0.98;
+          state.ballRadius -= 0.5;
 
-          // Ball slowly falls toward pockets
-          state.ballRadius -= 0.4;
-
-          if (angleDiffForTick(state)) {
+          const diff2 = Math.abs(state.ballAngle - state.lastTickAngle);
+          if (diff2 > SEG_ANGLE * 0.7) {
+            state.lastTickAngle = state.ballAngle;
             audioEngine.playBallTick();
           }
 
-          // When ball reaches pocket area
-          if (state.ballRadius <= POCKET_RADIUS + 30) {
+          if (state.ballRadius <= NUM_RING_OUTER - 5) {
             state.phase = "bouncing";
             state.bounceCount = 0;
             audioEngine.playBallBounce();
           }
           break;
         }
-
         case "bouncing": {
           state.wheelRotation += state.wheelSpeed;
           state.wheelSpeed *= 0.998;
-          state.ballAngle += state.ballSpeed * 0.5;
-          state.ballSpeed *= 0.95;
-
-          // Ball bounces between pockets
+          state.ballAngle += state.ballSpeed * 0.4;
+          state.ballSpeed *= 0.93;
           state.bounceCount++;
-          if (state.bounceCount % 15 === 0 && state.bounceCount < 60) {
-            state.ballRadius += (Math.random() - 0.5) * 3;
+
+          if (state.bounceCount % 12 === 0 && state.bounceCount < 50) {
+            state.ballRadius += (Math.random() - 0.3) * 4;
             audioEngine.playBallBounce();
           }
 
-          // Settle into target pocket
-          if (state.bounceCount > 60) {
+          if (state.bounceCount > 50) {
             state.phase = "settled";
-            state.ballRadius = POCKET_RADIUS + 18;
-
-            // Calculate final ball angle to match target number on wheel
             const targetIdx = WHEEL_NUMBERS.indexOf(state.targetNumber);
-            const targetAngle = targetIdx * SEGMENT_ANGLE + state.wheelRotation + SEGMENT_ANGLE / 2;
-            state.ballAngle = targetAngle;
-
+            const targetA = targetIdx * SEG_ANGLE + state.wheelRotation + SEG_ANGLE / 2;
+            state.ballAngle = targetA;
+            state.ballRadius = (NUM_RING_OUTER + NUM_RING_INNER) / 2;
             audioEngine.playBallSettle();
           }
           break;
         }
-
         case "settled": {
-          // Keep wheel slowly rotating with ball locked in pocket
           state.wheelRotation += state.wheelSpeed;
           state.wheelSpeed *= 0.99;
 
-          // Ball stays in pocket (rotates with wheel)
           const targetIdx = WHEEL_NUMBERS.indexOf(state.targetNumber);
-          const targetAngle = targetIdx * SEGMENT_ANGLE + state.wheelRotation + SEGMENT_ANGLE / 2;
-          state.ballAngle += (targetAngle - state.ballAngle) * 0.1;
-          state.ballRadius += (POCKET_RADIUS + 18 - state.ballRadius) * 0.1;
+          const targetA = targetIdx * SEG_ANGLE + state.wheelRotation + SEG_ANGLE / 2;
+          state.ballAngle += (targetA - state.ballAngle) * 0.08;
 
-          if (state.wheelSpeed < 0.001 && !state.ballSettled) {
-            state.ballSettled = true;
-            // Signal game store that spin animation is complete
-            if (spinComplete) spinComplete();
+          if (state.wheelSpeed < 0.001) {
+            state.showResult = true;
+            if (!state.ballSettled) {
+              state.ballSettled = true;
+              if (spinComplete) spinComplete();
+            }
           }
           break;
         }
       }
     }
 
-    function angleDiffForTick(state: typeof stateRef.current) {
-      const diff = Math.abs(state.ballAngle - state.lastTickAngle);
-      if (diff > SEGMENT_ANGLE * 0.8) {
-        state.lastTickAngle = state.ballAngle;
-        return Math.random() > 0.4;
-      }
-      return false;
-    }
 
     function loop() {
       const state = stateRef.current;
+      if (state.phase !== "idle") updatePhysics();
+
+      ctx.clearRect(0, 0, SIZE, SIZE);
+
+      // Draw wheel layers
+      drawWoodRing(ctx);
+      drawNumberCrown(ctx, state.wheelRotation);
+      drawConeAndTurret(ctx);
+
+      // Draw ball
       if (state.phase !== "idle") {
-        updatePhysics();
+        drawBall(ctx, state.ballAngle, state.ballRadius);
       }
-      drawWheel();
+
+      // Draw winning number overlay
+      if (state.showResult && state.targetNumber >= 0) {
+        drawWinningNumber(ctx, state.targetNumber);
+      }
+
       animationRef.current = requestAnimationFrame(loop);
     }
 
@@ -401,52 +444,17 @@ export default function RouletteWheel3D() {
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [CENTER, OUTER_RADIUS, BALL_TRACK_RADIUS, POCKET_RADIUS, CANVAS_SIZE, NUM_SEGMENTS, SEGMENT_ANGLE, spinComplete]);
+  }, [C, OUTER_R, WOOD_R, NUM_RING_OUTER, NUM_RING_INNER, CONE_R, BALL_TRACK, SIZE, SEGMENTS, SEG_ANGLE, spinComplete]);
 
   return (
-    <div className="relative flex items-center justify-center" style={{ perspective: "800px" }}>
-      {/* 3D tilt effect */}
-      <div
-        className="relative"
-        style={{
-          transform: "rotateX(15deg)",
-          transformStyle: "preserve-3d",
-        }}
-      >
-        {/* Outer glow ring */}
-        <div
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            width: CANVAS_SIZE + 30,
-            height: CANVAS_SIZE + 30,
-            top: -15,
-            left: -15,
-            background: "radial-gradient(circle, rgba(201,164,53,0.15) 60%, transparent 70%)",
-            boxShadow: "0 0 40px rgba(201,164,53,0.2), 0 20px 60px rgba(0,0,0,0.5)",
-          }}
-        />
-
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_SIZE}
-          height={CANVAS_SIZE}
-          className="relative z-10"
-          style={{
-            filter: "drop-shadow(0 10px 30px rgba(0,0,0,0.6))",
-          }}
-        />
-
-        {/* Table reflection below wheel */}
-        <div
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 pointer-events-none"
-          style={{
-            width: CANVAS_SIZE * 0.8,
-            height: 40,
-            background: "radial-gradient(ellipse, rgba(201,164,53,0.08) 0%, transparent 70%)",
-            filter: "blur(10px)",
-          }}
-        />
-      </div>
+    <div className="flex-shrink-0">
+      <canvas
+        ref={canvasRef}
+        width={SIZE}
+        height={SIZE}
+        className="block"
+        style={{ filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.5))" }}
+      />
     </div>
   );
 }
