@@ -9,6 +9,7 @@ import ChatPanel from "@/components/ChatPanel";
 import HUD from "@/components/HUD";
 import BotModerator from "@/components/BotModerator";
 import PlayersBar from "@/components/PlayersBar";
+import CasinoBackground from "@/components/CasinoBackground";
 import { useGameStore } from "@/store/game-store";
 
 export default function Home() {
@@ -35,7 +36,10 @@ export default function Home() {
   }
 
   return (
-    <main className="relative min-h-screen flex bg-black overflow-hidden">
+    <main className="relative min-h-screen flex overflow-hidden">
+      {/* Casino Background with C8L Logo */}
+      <CasinoBackground />
+
       {/* Bot Moderator (top-left, doesn't obstruct) */}
       <BotModerator />
 
@@ -46,7 +50,8 @@ export default function Home() {
       <PlayersBar />
 
       {/* Main game area - horizontal layout: Table LEFT, Wheel RIGHT */}
-      <div className="flex-1 flex items-center justify-center p-4 gap-8">
+      {/* Shifted right to avoid bot overlap */}
+      <div className="flex-1 flex items-center justify-center p-4 gap-8 pl-[240px]">
         {/* LEFT: Betting Table + Controls */}
         <div className="flex flex-col gap-3 max-w-[540px]">
           <BettingTable3D />
