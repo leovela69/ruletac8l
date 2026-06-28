@@ -1,15 +1,31 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useGameStore } from "@/store/game-store";
 import { createPlayerMessage } from "@/lib/bot-crupier";
 import Image from "next/image";
 
+// Emoji picker simple
+const EMOJI_SETS = [
+  ["🎰", "🎲", "💰", "🔥", "💎", "👑", "🍀", "⚡"],
+  ["😂", "😎", "🤑", "😱", "🥳", "😤", "🙏", "💪"],
+  ["❤️", "👍", "👎", "🎉", "💀", "🤡", "🫡", "🫠"],
+];
+
 export default function ChatPanel() {
   const { data: session } = useSession();
-  const { chatMessages, addChatMessage, botPlayers } = useGameStore();
+  const {
+    chatMessages,
+    addChatMessage,
+    botPlayers,
+    chatOpen,
+    toggleChat,
+    unreadCount,
+    markChatRead,
+  } = useGameStore();
   const [input, setInput] = useState("");
+  const [showEmojis, setShowEmojis] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,10 +34,16 @@ export default function ChatPanel() {
     }
   }, [chatMessages]);
 
-  const handleSend = () => {
+  // Mark as read when panel opens
+  useEffect(() => {
+    if (chatOpen) {
+      markChatRead();
+    }
+  }, [chatOpen, markChatRead]);
+
+  const handleSend = useCallback(() => {
     if (!input.trim()) return;
     if (!session?.user) return;
-    // Create message with real user data
     const msg = {
       ...createPlayerMessage(input.trim()),
       sender: session.user.name || "Jugador",
@@ -29,23 +51,86 @@ export default function ChatPanel() {
     };
     addChatMessage(msg);
     setInput("");
-  };
+    setShowEmojis(false);
+  }, [input, session, addChatMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSend();
   };
 
+  const insertEmoji = (emoji: string) => {
+    setInput(prev => prev + emoji);
+  };
+
+  // Play notification sound for bot messages when chat is closed
+  useEffect(() => {
+    if (!chatOpen && unreadCount > 0) {
+      // Simple pop sound using Web Audio API
+      try {
+        const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = "sine";
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 0.3);
+      } catch {
+        // Audio not available
+      }
+    }
+  }, [unreadCount, chatOpen]);
+
+  // If chat is closed, show the toggle button only
+  if (!chatOpen) {
+    return (
+      <button
+        onClick={toggleChat}
+        className="fixed right-4 top-1/2 -translate-y-1/2 z-50
+                   w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600
+                   flex items-center justify-center shadow-lg shadow-teal-500/30
+                   hover:scale-110 transition-all duration-200
+                   border-2 border-teal-300/30 animate-pulse"
+        title="Abrir chat"
+      >
+        <span className="text-2xl">💬</span>
+        {unreadCount > 0 && (
+          <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full
+                          flex items-center justify-center px-1 border-2 border-black
+                          animate-bounce">
+            <span className="text-white text-[9px] font-bold font-mono">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          </div>
+        )}
+      </button>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full bg-black/70 backdrop-blur-sm">
-      {/* Header */}
+    <div className="flex flex-col h-full bg-black/80 backdrop-blur-md border-l border-white/10">
+      {/* Header with close button */}
       <div className="p-3 border-b border-white/10">
         <div className="flex items-center justify-between">
           <span className="text-white font-mono text-xs font-bold uppercase tracking-wider">
             💬 Chat Mesa
           </span>
-          <span className="text-gray-500 font-mono text-[9px]">
-            {botPlayers.length + 1} online
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 font-mono text-[9px]">
+              {botPlayers.length + 1} online
+            </span>
+            <button
+              onClick={toggleChat}
+              className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-500/30
+                         flex items-center justify-center transition-colors group"
+              title="Cerrar chat"
+            >
+              <span className="text-gray-400 group-hover:text-red-300 text-xs font-bold">✕</span>
+            </button>
+          </div>
         </div>
 
         {/* Online Players - circular avatars */}
@@ -97,7 +182,6 @@ export default function ChatPanel() {
                 {/* Avatar */}
                 <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 border border-white/10">
                   {msg.senderAvatar && msg.senderAvatar.length > 2 ? (
-                    // Real image URL (Google avatar)
                     <Image
                       src={msg.senderAvatar}
                       alt={msg.sender}
@@ -106,7 +190,6 @@ export default function ChatPanel() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    // Emoji avatar (bots)
                     <div className="w-full h-full bg-gray-800 flex items-center justify-center">
                       <span className="text-sm">{msg.senderAvatar || "🎲"}</span>
                     </div>
@@ -127,6 +210,9 @@ export default function ChatPanel() {
                   <p className="text-gray-200 text-[11px] break-words leading-relaxed mt-0.5">
                     {msg.text}
                   </p>
+                  <span className="text-gray-600 text-[8px] font-mono">
+                    {new Date(msg.timestamp).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
                 </div>
               </div>
             )}
@@ -166,8 +252,35 @@ export default function ChatPanel() {
               </button>
             </div>
 
+            {/* Emoji picker */}
+            {showEmojis && (
+              <div className="mb-2 bg-black/90 border border-white/10 rounded-lg p-2 space-y-1.5">
+                {EMOJI_SETS.map((row, rowIdx) => (
+                  <div key={rowIdx} className="flex gap-1">
+                    {row.map((emoji, i) => (
+                      <button
+                        key={i}
+                        onClick={() => insertEmoji(emoji)}
+                        className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-base"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Chat input */}
             <div className="flex gap-1.5">
+              <button
+                onClick={() => setShowEmojis(!showEmojis)}
+                className={`px-2 py-2 rounded-lg text-sm transition-colors
+                  ${showEmojis ? "bg-teal-600/30 text-teal-300" : "bg-white/5 text-gray-400 hover:text-white"}`}
+                title="Emojis"
+              >
+                😊
+              </button>
               <input
                 type="text"
                 value={input}
@@ -189,24 +302,28 @@ export default function ChatPanel() {
             </div>
           </div>
         ) : (
-          /* Login prompt */
-          <button
-            onClick={() => signIn("google")}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl
-                       bg-white/10 border border-white/20 hover:bg-white/15
-                       transition-all group"
-          >
-            {/* Google icon */}
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            <span className="text-white text-xs font-mono group-hover:text-teal-200 transition-colors">
-              Entrar con Google para chatear
-            </span>
-          </button>
+          /* Login prompt - visitors see read-only notice */
+          <div className="space-y-2">
+            <p className="text-gray-500 text-[10px] font-mono text-center">
+              👁️ Modo espectador — Solo lectura
+            </p>
+            <button
+              onClick={() => signIn("google")}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl
+                         bg-white/10 border border-white/20 hover:bg-white/15
+                         transition-all group"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              <span className="text-white text-xs font-mono group-hover:text-teal-200 transition-colors">
+                Entrar con Google para chatear
+              </span>
+            </button>
+          </div>
         )}
       </div>
     </div>

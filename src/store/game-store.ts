@@ -30,10 +30,21 @@ import {
   getBotReactionMessage,
   createSystemMessage,
   createBotMessage,
+  getNarrationMessage,
 } from "@/lib/bot-crupier";
 import { audioEngine } from "@/lib/audio-engine";
 
 export type GamePhase = "betting" | "spinning" | "result";
+
+// Burbuja flotante sobre un jugador
+export interface PlayerBubble {
+  id: string;
+  playerId: string;
+  playerName: string;
+  playerAvatar: string;
+  text: string;
+  timestamp: number;
+}
 
 interface GameState {
   // Player state
@@ -50,6 +61,11 @@ interface GameState {
   botPlayers: BotPlayer[];
   initialized: boolean;
 
+  // Chat UI state
+  chatOpen: boolean;
+  unreadCount: number;
+  playerBubbles: PlayerBubble[];
+
   // Actions
   initGame: () => void;
   placeBet: (bet: Bet) => boolean;
@@ -63,6 +79,10 @@ interface GameState {
   claimBankruptcyRecovery: () => boolean;
   resetGame: () => void;
   addChatMessage: (msg: ChatMessage) => void;
+  toggleChat: () => void;
+  markChatRead: () => void;
+  addPlayerBubble: (bubble: PlayerBubble) => void;
+  removePlayerBubble: (id: string) => void;
 
   // Computed helpers
   getTotalBetAmount: () => number;
@@ -80,6 +100,9 @@ export const useGameStore = create<GameState>()(
       chatMessages: [],
       botPlayers: [],
       initialized: false,
+      chatOpen: true,
+      unreadCount: 0,
+      playerBubbles: [],
 
       initGame: () => {
         const state = get();
@@ -182,6 +205,12 @@ export const useGameStore = create<GameState>()(
         const leon = state.botPlayers.find(b => b.isHouse)!;
         newMessages.push(createBotMessage(leon, getCrupierResultMessage(result.number)));
 
+        // Narration of the play (bot explains what happened)
+        const narration = getNarrationMessage(state.currentBets, result);
+        if (narration) {
+          newMessages.push(createBotMessage(leon, narration));
+        }
+
         // Bot reactions
         state.botPlayers.forEach(bot => {
           if (!bot.isHouse && Math.random() > 0.5) {
@@ -202,9 +231,13 @@ export const useGameStore = create<GameState>()(
 
         audioEngine.playCrupierChime();
 
+        // Increment unread if chat is closed
+        const unreadIncrement = state.chatOpen ? 0 : newMessages.length - state.chatMessages.length;
+
         set({
           phase: "result",
           chatMessages: newMessages.slice(-50),
+          unreadCount: state.unreadCount + unreadIncrement,
           player: {
             ...state.player,
             balance: state.player.balance + result.totalWin,
@@ -268,12 +301,58 @@ export const useGameStore = create<GameState>()(
           lastResult: null,
           chatMessages: [],
           initialized: false,
+          chatOpen: true,
+          unreadCount: 0,
+          playerBubbles: [],
         });
       },
 
       addChatMessage: (msg: ChatMessage) => {
         const state = get();
-        set({ chatMessages: [...state.chatMessages, msg].slice(-50) });
+        const newMessages = [...state.chatMessages, msg].slice(-50);
+        const newUnread = state.chatOpen ? 0 : state.unreadCount + 1;
+        set({ chatMessages: newMessages, unreadCount: newUnread });
+
+        // If it's a player/bot message (not system), create a bubble
+        if (!msg.isSystem && state.phase !== "spinning") {
+          const bubble: PlayerBubble = {
+            id: msg.id + "_bubble",
+            playerId: msg.sender,
+            playerName: msg.sender,
+            playerAvatar: msg.senderAvatar,
+            text: msg.text.length > 60 ? msg.text.substring(0, 57) + "..." : msg.text,
+            timestamp: Date.now(),
+          };
+          const newBubbles = [...state.playerBubbles.filter(b => b.playerId !== msg.sender), bubble];
+          set({ playerBubbles: newBubbles });
+
+          // Auto-remove bubble after 6 seconds
+          setTimeout(() => {
+            const current = get();
+            set({ playerBubbles: current.playerBubbles.filter(b => b.id !== bubble.id) });
+          }, 6000);
+        }
+      },
+
+      toggleChat: () => {
+        const state = get();
+        const newOpen = !state.chatOpen;
+        set({ chatOpen: newOpen, unreadCount: newOpen ? 0 : state.unreadCount });
+      },
+
+      markChatRead: () => {
+        set({ unreadCount: 0 });
+      },
+
+      addPlayerBubble: (bubble: PlayerBubble) => {
+        const state = get();
+        const newBubbles = [...state.playerBubbles.filter(b => b.playerId !== bubble.playerId), bubble];
+        set({ playerBubbles: newBubbles });
+      },
+
+      removePlayerBubble: (id: string) => {
+        const state = get();
+        set({ playerBubbles: state.playerBubbles.filter(b => b.id !== id) });
       },
 
       getTotalBetAmount: () => {

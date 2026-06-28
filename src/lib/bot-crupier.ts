@@ -1,5 +1,5 @@
 // C8L Bot Crupier - IA de la casa
-import { Bet, createStraightBet, createRedBet, createBlackBet, createDozenBet, getNumberColor } from "./roulette-engine";
+import { Bet, SpinResult, createStraightBet, createRedBet, createBlackBet, createDozenBet, getNumberColor } from "./roulette-engine";
 
 export interface BotPlayer {
   id: string;
@@ -183,4 +183,59 @@ export function createPlayerMessage(text: string): ChatMessage {
     isSystem: false,
     isBot: false,
   };
+}
+
+
+
+// Narración automática de jugadas - el bot explica qué pasó
+export function getNarrationMessage(bets: Bet[], result: SpinResult): string | null {
+  if (bets.length === 0) return null;
+
+  const totalBet = bets.reduce((sum, b) => sum + b.amount, 0);
+  const winners = result.betsResults.filter(r => r.won);
+  const losers = result.betsResults.filter(r => !r.won);
+
+  // Describe the bets placed
+  const betDescriptions: string[] = [];
+  const typeCounts: Record<string, number> = {};
+  bets.forEach(b => {
+    typeCounts[b.type] = (typeCounts[b.type] || 0) + 1;
+  });
+
+  const typeLabels: Record<string, string> = {
+    straight: "pleno",
+    split: "caballo",
+    street: "transversal",
+    corner: "cuadro",
+    six_line: "seisena",
+    column: "columna",
+    dozen: "docena",
+    red: "rojo",
+    black: "negro",
+    even: "par",
+    odd: "impar",
+    low: "1-18",
+    high: "19-36",
+  };
+
+  Object.entries(typeCounts).forEach(([type, count]) => {
+    const label = typeLabels[type] || type;
+    if (count > 1) {
+      betDescriptions.push(`${count}x ${label}`);
+    } else {
+      betDescriptions.push(label);
+    }
+  });
+
+  const betSummary = betDescriptions.join(", ");
+
+  if (result.totalWin > 0) {
+    const profit = result.totalWin - totalBet;
+    if (profit > 5000) {
+      return `📊 Jugada: ${betSummary} por ${totalBet.toLocaleString()}. GANANCIA BRUTAL: +${result.totalWin.toLocaleString()} fichas! Beneficio neto: +${profit.toLocaleString()}. Que jugada maestra!`;
+    }
+    return `📊 Aposto ${totalBet.toLocaleString()} en ${betSummary}. Gano ${result.totalWin.toLocaleString()} fichas (+${profit.toLocaleString()} neto). Buena lectura!`;
+  } else {
+    return `📊 Aposto ${totalBet.toLocaleString()} en ${betSummary}. No hubo suerte esta vez. -${totalBet.toLocaleString()} fichas. La proxima sera!`;
+  }
 }

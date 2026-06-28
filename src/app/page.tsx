@@ -9,12 +9,13 @@ import ChatPanel from "@/components/ChatPanel";
 import HUD from "@/components/HUD";
 import BotModerator from "@/components/BotModerator";
 import PlayersBar from "@/components/PlayersBar";
+import PlayerBubbles from "@/components/PlayerBubbles";
 import CasinoBackground from "@/components/CasinoBackground";
 import { useGameStore } from "@/store/game-store";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
-  const { initGame } = useGameStore();
+  const { initGame, chatOpen } = useGameStore();
 
   useEffect(() => {
     setMounted(true);
@@ -49,9 +50,12 @@ export default function Home() {
       {/* Players Bar (bottom-left) */}
       <PlayersBar />
 
+      {/* Player chat bubbles (floating above seats) */}
+      <PlayerBubbles />
+
       {/* Main game area - horizontal layout: Table LEFT, Wheel RIGHT */}
-      {/* Shifted right to avoid bot overlap */}
-      <div className="flex-1 flex items-center justify-center p-4 gap-8 pl-[240px]">
+      <div className={`flex-1 flex items-center justify-center p-4 gap-8 pl-[240px] transition-all duration-300
+        ${chatOpen ? "pr-[16px]" : "pr-4"}`}>
         {/* LEFT: Betting Table + Controls */}
         <div className="flex flex-col gap-3 max-w-[540px]">
           <BettingTable3D />
@@ -62,10 +66,14 @@ export default function Home() {
         <RouletteWheel3D />
       </div>
 
-      {/* Chat Panel (right sidebar) */}
-      <div className="w-64 flex-shrink-0 border-l border-white/5 h-screen">
+      {/* Chat Panel (right sidebar) - conditionally rendered */}
+      {chatOpen ? (
+        <div className="w-72 flex-shrink-0 h-screen transition-all duration-300 ease-in-out">
+          <ChatPanel />
+        </div>
+      ) : (
         <ChatPanel />
-      </div>
+      )}
 
       {/* Result Overlay */}
       <ResultOverlay />
