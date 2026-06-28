@@ -50,9 +50,10 @@ export default function Home() {
       <PlayersBar />
 
       {/* Main game area - horizontal layout: Table LEFT, Wheel RIGHT */}
-      <div className="flex-1 flex items-center justify-center p-4 gap-6 relative z-10">
+      {/* Shifted right to avoid bot overlap */}
+      <div className="flex-1 flex items-center justify-center p-4 gap-8 pl-[240px]">
         {/* LEFT: Betting Table + Controls */}
-        <div className="flex flex-col gap-3 w-[520px] flex-shrink-0">
+        <div className="flex flex-col gap-3 max-w-[540px]">
           <BettingTable3D />
           <ControlBar />
         </div>
