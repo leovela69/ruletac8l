@@ -35,29 +35,51 @@ export default function BettingTable3D() {
     return currentBets.filter(b => b.type === type);
   };
 
-  // Render turquoise chip on cell
+  // Render turquoise chip on cell - stacked and clearly visible
   const renderChip = (bets: typeof currentBets) => {
     if (bets.length === 0) return null;
     const count = bets.length;
+    const totalAmount = bets.reduce((sum, b) => sum + b.amount, 0);
     return (
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
         <div className="relative">
-          {/* Chip stack */}
-          {bets.slice(0, 4).map((_, i) => (
+          {/* Stack of chips */}
+          {bets.slice(0, 5).map((bet, i) => (
             <div
               key={i}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-              style={{ transform: `translate(-50%, -50%) translateY(${-i * 2}px)` }}
+              className="absolute left-1/2 top-1/2"
+              style={{
+                transform: `translate(-50%, -50%) translateY(${-i * 3}px)`,
+                zIndex: 20 + i,
+              }}
             >
-              <div className="w-7 h-7 rounded-full bg-teal-400 border-[3px] border-dashed border-sky-600 flex items-center justify-center shadow-md">
-                <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-sky-700" />
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center shadow-lg"
+                style={{
+                  background: "radial-gradient(circle at 35% 35%, #5eead4, #14b8a6, #0d9488)",
+                  border: "3px dashed rgba(56, 189, 248, 0.8)",
+                  boxShadow: `0 ${2 + i}px ${4 + i * 2}px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.3)`,
+                }}
+              >
+                <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-sky-200" />
               </div>
             </div>
           ))}
+          {/* Amount label */}
+          <div
+            className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-teal-300 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap border border-teal-500/30"
+            style={{ zIndex: 30 }}
+          >
+            {totalAmount >= 1000 ? `${(totalAmount / 1000).toFixed(1)}K` : totalAmount}
+          </div>
+          {/* Count badge if multiple */}
           {count > 1 && (
-            <span className="absolute -top-1 -right-1 bg-white text-black text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center z-30">
-              {count}
-            </span>
+            <div
+              className="absolute -top-1 -right-1 bg-white text-black text-[7px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-gray-300"
+              style={{ zIndex: 30 }}
+            >
+              x{count}
+            </div>
           )}
         </div>
       </div>

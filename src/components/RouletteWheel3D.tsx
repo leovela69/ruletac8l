@@ -21,27 +21,28 @@ export default function RouletteWheel3D() {
     bounceCount: 0,
     ballSettled: false,
     showResult: false,
+    tickCooldown: 0,
   });
 
   const { phase, lastResult, spinComplete } = useGameStore();
 
-  const SIZE = 400;
+  const SIZE = 420;
   const C = SIZE / 2;
   const OUTER_R = C - 12;
   const WOOD_R = OUTER_R - 8;
-  const NUM_RING_OUTER = WOOD_R - 20;
-  const NUM_RING_INNER = NUM_RING_OUTER - 36;
-  const CONE_R = NUM_RING_INNER - 8;
-  const BALL_TRACK = WOOD_R - 10;
+  const NUM_RING_OUTER = WOOD_R - 22;
+  const NUM_RING_INNER = NUM_RING_OUTER - 38;
+  const CONE_R = NUM_RING_INNER - 10;
+  const BALL_TRACK = WOOD_R - 12;
   const SEGMENTS = 37;
   const SEG_ANGLE = (2 * Math.PI) / SEGMENTS;
-
 
   const startSpin = useCallback((targetNum: number) => {
     const state = stateRef.current;
     state.phase = "spinning";
-    state.wheelSpeed = 0.06 + Math.random() * 0.02;
-    state.ballSpeed = -(0.10 + Math.random() * 0.03);
+    // Much faster initial speed for longer, smoother spin
+    state.wheelSpeed = 0.12 + Math.random() * 0.04;
+    state.ballSpeed = -(0.18 + Math.random() * 0.05);
     state.ballRadius = BALL_TRACK;
     state.targetNumber = targetNum;
     state.startTime = performance.now();
@@ -49,8 +50,9 @@ export default function RouletteWheel3D() {
     state.ballSettled = false;
     state.showResult = false;
     state.lastTickAngle = state.ballAngle;
+    state.tickCooldown = 0;
     audioEngine.init();
-    audioEngine.playSpinning(5.5);
+    audioEngine.playSpinning(9); // Longer spin sound
   }, [BALL_TRACK]);
 
   useEffect(() => {
@@ -64,8 +66,7 @@ export default function RouletteWheel3D() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
 
-
-    function drawWoodRing(ctx: CanvasRenderingContext2D) {
+    function drawWoodRing() {
       // Outer metallic brass ring
       const brassGrad = ctx.createRadialGradient(C, C, OUTER_R - 10, C, C, OUTER_R);
       brassGrad.addColorStop(0, "#d4a843");
@@ -77,7 +78,7 @@ export default function RouletteWheel3D() {
       ctx.fillStyle = brassGrad;
       ctx.fill();
 
-      // Wood ring (pine/light wood with vertical grain)
+      // Wood ring
       const woodGrad = ctx.createRadialGradient(C, C, NUM_RING_OUTER + 2, C, C, WOOD_R);
       woodGrad.addColorStop(0, "#c8a050");
       woodGrad.addColorStop(0.3, "#dbb56a");
@@ -90,20 +91,18 @@ export default function RouletteWheel3D() {
       ctx.fillStyle = woodGrad;
       ctx.fill("evenodd");
 
-      // Wood grain lines
+      // Wood grain
       for (let i = 0; i < 60; i++) {
         const angle = (i / 60) * Math.PI * 2;
-        const r1 = NUM_RING_OUTER + 4;
-        const r2 = WOOD_R - 2;
         ctx.beginPath();
-        ctx.moveTo(C + Math.cos(angle) * r1, C + Math.sin(angle) * r1);
-        ctx.lineTo(C + Math.cos(angle) * r2, C + Math.sin(angle) * r2);
-        ctx.strokeStyle = "rgba(100, 60, 20, 0.15)";
+        ctx.moveTo(C + Math.cos(angle) * (NUM_RING_OUTER + 4), C + Math.sin(angle) * (NUM_RING_OUTER + 4));
+        ctx.lineTo(C + Math.cos(angle) * (WOOD_R - 2), C + Math.sin(angle) * (WOOD_R - 2));
+        ctx.strokeStyle = "rgba(100, 60, 20, 0.12)";
         ctx.lineWidth = 1;
         ctx.stroke();
       }
 
-      // Diamond deflectors on wood ring
+      // Diamond deflectors
       for (let i = 0; i < 8; i++) {
         const angle = (i / 8) * Math.PI * 2;
         const dx = C + Math.cos(angle) * (NUM_RING_OUTER + 14);
@@ -111,16 +110,13 @@ export default function RouletteWheel3D() {
         ctx.save();
         ctx.translate(dx, dy);
         ctx.rotate(angle);
-        // Diamond shape
         ctx.beginPath();
-        ctx.moveTo(0, -5);
-        ctx.lineTo(3.5, 0);
-        ctx.moveTo(0, -5);
-        ctx.lineTo(-3.5, 0);
-        ctx.lineTo(0, 5);
-        ctx.lineTo(3.5, 0);
+        ctx.moveTo(0, -6);
+        ctx.lineTo(4, 0);
+        ctx.lineTo(0, 6);
+        ctx.lineTo(-4, 0);
         ctx.closePath();
-        const dGrad = ctx.createLinearGradient(-4, -5, 4, 5);
+        const dGrad = ctx.createLinearGradient(-4, -6, 4, 6);
         dGrad.addColorStop(0, "#f0d060");
         dGrad.addColorStop(0.5, "#c49a30");
         dGrad.addColorStop(1, "#8b6914");
@@ -132,24 +128,22 @@ export default function RouletteWheel3D() {
         ctx.restore();
       }
 
-      // Inner brass ring (between wood and number crown)
+      // Inner brass ring
       ctx.beginPath();
       ctx.arc(C, C, NUM_RING_OUTER + 2, 0, Math.PI * 2);
       ctx.strokeStyle = "#c49a30";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.stroke();
     }
 
-
-    function drawNumberCrown(ctx: CanvasRenderingContext2D, rotation: number) {
-      // Black number ring background
+    function drawNumberCrown(rotation: number) {
+      // Black background ring
       ctx.beginPath();
       ctx.arc(C, C, NUM_RING_OUTER, 0, Math.PI * 2);
       ctx.arc(C, C, NUM_RING_INNER, 0, Math.PI * 2);
-      ctx.fillStyle = "#111";
+      ctx.fillStyle = "#0a0a0a";
       ctx.fill("evenodd");
 
-      // Draw colored segments with numbers
       for (let i = 0; i < SEGMENTS; i++) {
         const num = WHEEL_NUMBERS[i];
         const color = getNumberColor(num);
@@ -162,35 +156,28 @@ export default function RouletteWheel3D() {
         ctx.arc(C, C, NUM_RING_OUTER - 1, startA, endA);
         ctx.arc(C, C, NUM_RING_INNER + 1, endA, startA, true);
         ctx.closePath();
-
         if (color === "red") ctx.fillStyle = "#c0392b";
         else if (color === "black") ctx.fillStyle = "#1a1a2e";
         else ctx.fillStyle = "#27ae60";
         ctx.fill();
 
-        // Gold divider line
+        // Gold divider
         ctx.beginPath();
-        ctx.moveTo(
-          C + Math.cos(startA) * (NUM_RING_INNER + 1),
-          C + Math.sin(startA) * (NUM_RING_INNER + 1)
-        );
-        ctx.lineTo(
-          C + Math.cos(startA) * (NUM_RING_OUTER - 1),
-          C + Math.sin(startA) * (NUM_RING_OUTER - 1)
-        );
-        ctx.strokeStyle = "rgba(196, 154, 48, 0.6)";
-        ctx.lineWidth = 1;
+        ctx.moveTo(C + Math.cos(startA) * (NUM_RING_INNER + 1), C + Math.sin(startA) * (NUM_RING_INNER + 1));
+        ctx.lineTo(C + Math.cos(startA) * (NUM_RING_OUTER - 1), C + Math.sin(startA) * (NUM_RING_OUTER - 1));
+        ctx.strokeStyle = "rgba(196, 154, 48, 0.5)";
+        ctx.lineWidth = 1.2;
         ctx.stroke();
 
-        // Number text (radial orientation)
+        // Number text radial
         const textR = (NUM_RING_OUTER + NUM_RING_INNER) / 2;
         const tx = C + Math.cos(midA) * textR;
         const ty = C + Math.sin(midA) * textR;
         ctx.save();
         ctx.translate(tx, ty);
         ctx.rotate(midA + Math.PI / 2);
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 11px Arial, Helvetica, sans-serif";
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 11px Arial, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(num.toString(), 0, 0);
@@ -205,9 +192,8 @@ export default function RouletteWheel3D() {
       ctx.stroke();
     }
 
-
-    function drawConeAndTurret(ctx: CanvasRenderingContext2D) {
-      // Dark wood cone center
+    function drawConeAndTurret() {
+      // Dark wood cone
       const coneGrad = ctx.createRadialGradient(C - 10, C - 10, 0, C, C, CONE_R);
       coneGrad.addColorStop(0, "#8b6530");
       coneGrad.addColorStop(0.3, "#6b4520");
@@ -218,117 +204,101 @@ export default function RouletteWheel3D() {
       ctx.fillStyle = coneGrad;
       ctx.fill();
 
-      // Concentric wood rings on cone
-      for (let r = 15; r < CONE_R; r += 12) {
+      // Concentric wood rings
+      for (let r = 15; r < CONE_R; r += 10) {
         ctx.beginPath();
         ctx.arc(C, C, r, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(139, 101, 48, ${0.2 + (r / CONE_R) * 0.2})`;
-        ctx.lineWidth = 0.8;
+        ctx.strokeStyle = `rgba(139, 101, 48, ${0.15 + (r / CONE_R) * 0.15})`;
+        ctx.lineWidth = 0.7;
         ctx.stroke();
       }
 
-      // Turret cross (4 arms with golden spheres)
-      const armLength = 30;
+      // Turret cross 4 arms
+      const armLen = 32;
       const arms = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
-      
       arms.forEach((angle) => {
-        const x1 = C;
-        const y1 = C;
-        const x2 = C + Math.cos(angle) * armLength;
-        const y2 = C + Math.sin(angle) * armLength;
-
-        // Arm
+        const x2 = C + Math.cos(angle) * armLen;
+        const y2 = C + Math.sin(angle) * armLen;
         ctx.beginPath();
-        ctx.moveTo(x1, y1);
+        ctx.moveTo(C, C);
         ctx.lineTo(x2, y2);
         ctx.strokeStyle = "#c49a30";
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 5;
         ctx.stroke();
         ctx.strokeStyle = "#f0d060";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // Sphere at tip
-        const sphereGrad = ctx.createRadialGradient(
-          x2 - 2, y2 - 2, 0, x2, y2, 6
-        );
-        sphereGrad.addColorStop(0, "#f0d060");
-        sphereGrad.addColorStop(0.4, "#c49a30");
-        sphereGrad.addColorStop(0.8, "#8b6914");
-        sphereGrad.addColorStop(1, "#5a4510");
+        // Sphere tip
+        const sg = ctx.createRadialGradient(x2 - 2, y2 - 2, 0, x2, y2, 7);
+        sg.addColorStop(0, "#f5e080");
+        sg.addColorStop(0.4, "#c49a30");
+        sg.addColorStop(0.8, "#8b6914");
+        sg.addColorStop(1, "#5a4510");
         ctx.beginPath();
-        ctx.arc(x2, y2, 6, 0, Math.PI * 2);
-        ctx.fillStyle = sphereGrad;
+        ctx.arc(x2, y2, 7, 0, Math.PI * 2);
+        ctx.fillStyle = sg;
         ctx.fill();
-        ctx.strokeStyle = "#5a4510";
+        ctx.strokeStyle = "#4a3510";
         ctx.lineWidth = 1;
         ctx.stroke();
       });
 
-      // Center sphere (bigger)
-      const centerGrad = ctx.createRadialGradient(C - 3, C - 3, 0, C, C, 10);
-      centerGrad.addColorStop(0, "#f5e080");
-      centerGrad.addColorStop(0.4, "#d4a843");
-      centerGrad.addColorStop(0.8, "#8b6914");
-      centerGrad.addColorStop(1, "#5a4510");
+      // Center sphere
+      const cg = ctx.createRadialGradient(C - 3, C - 3, 0, C, C, 12);
+      cg.addColorStop(0, "#f5e080");
+      cg.addColorStop(0.4, "#d4a843");
+      cg.addColorStop(0.8, "#8b6914");
+      cg.addColorStop(1, "#5a4510");
       ctx.beginPath();
-      ctx.arc(C, C, 10, 0, Math.PI * 2);
-      ctx.fillStyle = centerGrad;
+      ctx.arc(C, C, 12, 0, Math.PI * 2);
+      ctx.fillStyle = cg;
       ctx.fill();
-      ctx.strokeStyle = "#5a4510";
+      ctx.strokeStyle = "#4a3510";
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
 
-
-    function drawBall(ctx: CanvasRenderingContext2D, angle: number, radius: number) {
+    function drawBall(angle: number, radius: number) {
       const bx = C + Math.cos(angle) * radius;
       const by = C + Math.sin(angle) * radius;
 
-      // Ball shadow
+      // Shadow
       ctx.beginPath();
-      ctx.arc(bx + 2, by + 2, 6, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.arc(bx + 2, by + 3, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
       ctx.fill();
 
-      // Ball body (flat gray with single highlight)
+      // Ball body
       ctx.beginPath();
       ctx.arc(bx, by, 6, 0, Math.PI * 2);
-      ctx.fillStyle = "#bbb";
+      ctx.fillStyle = "#ccc";
       ctx.fill();
-      ctx.strokeStyle = "#888";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#999";
+      ctx.lineWidth = 0.8;
       ctx.stroke();
 
-      // Highlight spot (top-left)
+      // Highlight
       ctx.beginPath();
       ctx.arc(bx - 2, by - 2, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
       ctx.fill();
     }
 
-    function drawWinningNumber(ctx: CanvasRenderingContext2D, num: number) {
-      // Giant fuchsia number in center
+    function drawWinningNumber(num: number) {
       ctx.save();
-      ctx.font = "bold 72px Arial, Helvetica, sans-serif";
+      ctx.font = "bold 76px Arial, Helvetica, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-
-      // Black stroke
       ctx.strokeStyle = "#000";
-      ctx.lineWidth = 6;
+      ctx.lineWidth = 8;
       ctx.strokeText(num.toString(), C, C);
-
-      // Fuchsia fill
       ctx.fillStyle = "#ff1493";
       ctx.fillText(num.toString(), C, C);
-
-      // Bright highlight
-      ctx.fillStyle = "rgba(255, 100, 200, 0.3)";
+      ctx.fillStyle = "rgba(255, 150, 220, 0.25)";
       ctx.fillText(num.toString(), C - 1, C - 1);
       ctx.restore();
     }
-
 
     function updatePhysics() {
       const state = stateRef.current;
@@ -336,36 +306,48 @@ export default function RouletteWheel3D() {
 
       switch (state.phase) {
         case "spinning": {
+          // Smooth deceleration with very gentle curve
           state.wheelRotation += state.wheelSpeed;
           state.ballAngle += state.ballSpeed;
-          state.ballSpeed *= 0.997;
-          state.wheelSpeed *= 0.999;
+          // Very gentle deceleration — spins for a long time
+          state.ballSpeed *= 0.9992;
+          state.wheelSpeed *= 0.9996;
 
-          const diff = Math.abs(state.ballAngle - state.lastTickAngle);
-          if (diff > SEG_ANGLE) {
+          // Tick sound synced to segments passing
+          state.tickCooldown--;
+          const angleDiff = Math.abs(state.ballAngle - state.lastTickAngle);
+          if (angleDiff > SEG_ANGLE && state.tickCooldown <= 0) {
             state.lastTickAngle = state.ballAngle;
-            if (Math.random() > 0.5) audioEngine.playBallTick();
+            state.tickCooldown = 2; // Prevent too many ticks
+            audioEngine.playBallTick();
           }
 
-          if (elapsed > 2.8) {
+          // Ball spins much longer (5+ seconds) before deceleration phase
+          if (elapsed > 5.0) {
             state.phase = "decelerating";
           }
           break;
         }
         case "decelerating": {
           state.wheelRotation += state.wheelSpeed;
-          state.wheelSpeed *= 0.996;
+          state.wheelSpeed *= 0.9985;
           state.ballAngle += state.ballSpeed;
-          state.ballSpeed *= 0.98;
-          state.ballRadius -= 0.5;
+          // Ball fights to keep rolling — slow deceleration
+          state.ballSpeed *= 0.993;
+          // Ball slowly spirals inward
+          state.ballRadius -= 0.25;
 
-          const diff2 = Math.abs(state.ballAngle - state.lastTickAngle);
-          if (diff2 > SEG_ANGLE * 0.7) {
+          // Tick sounds getting further apart as ball slows
+          state.tickCooldown--;
+          const diff = Math.abs(state.ballAngle - state.lastTickAngle);
+          if (diff > SEG_ANGLE * 0.6 && state.tickCooldown <= 0) {
             state.lastTickAngle = state.ballAngle;
+            state.tickCooldown = 3;
             audioEngine.playBallTick();
           }
 
-          if (state.ballRadius <= NUM_RING_OUTER - 5) {
+          // Ball reaches the pocket ring
+          if (state.ballRadius <= NUM_RING_OUTER - 3) {
             state.phase = "bouncing";
             state.bounceCount = 0;
             audioEngine.playBallBounce();
@@ -374,17 +356,23 @@ export default function RouletteWheel3D() {
         }
         case "bouncing": {
           state.wheelRotation += state.wheelSpeed;
-          state.wheelSpeed *= 0.998;
-          state.ballAngle += state.ballSpeed * 0.4;
-          state.ballSpeed *= 0.93;
+          state.wheelSpeed *= 0.9992;
+          state.ballAngle += state.ballSpeed * 0.35;
+          state.ballSpeed *= 0.96;
           state.bounceCount++;
 
-          if (state.bounceCount % 12 === 0 && state.bounceCount < 50) {
-            state.ballRadius += (Math.random() - 0.3) * 4;
+          // Multiple realistic bounces — ball hops between pockets
+          if (state.bounceCount % 8 === 0 && state.bounceCount < 80) {
+            // Ball bounces up and comes back down
+            state.ballRadius += (Math.random() - 0.4) * 5;
+            // Keep ball within pocket area
+            state.ballRadius = Math.min(state.ballRadius, NUM_RING_OUTER - 2);
+            state.ballRadius = Math.max(state.ballRadius, NUM_RING_INNER + 5);
             audioEngine.playBallBounce();
           }
 
-          if (state.bounceCount > 50) {
+          // Gradually settle
+          if (state.bounceCount > 80) {
             state.phase = "settled";
             const targetIdx = WHEEL_NUMBERS.indexOf(state.targetNumber);
             const targetA = targetIdx * SEG_ANGLE + state.wheelRotation + SEG_ANGLE / 2;
@@ -396,13 +384,16 @@ export default function RouletteWheel3D() {
         }
         case "settled": {
           state.wheelRotation += state.wheelSpeed;
-          state.wheelSpeed *= 0.99;
+          // Wheel keeps spinning gently even after ball settles
+          state.wheelSpeed *= 0.995;
 
+          // Ball locked in pocket, rotates with wheel
           const targetIdx = WHEEL_NUMBERS.indexOf(state.targetNumber);
           const targetA = targetIdx * SEG_ANGLE + state.wheelRotation + SEG_ANGLE / 2;
-          state.ballAngle += (targetA - state.ballAngle) * 0.08;
+          state.ballAngle += (targetA - state.ballAngle) * 0.06;
+          state.ballRadius += ((NUM_RING_OUTER + NUM_RING_INNER) / 2 - state.ballRadius) * 0.05;
 
-          if (state.wheelSpeed < 0.001) {
+          if (state.wheelSpeed < 0.0008) {
             state.showResult = true;
             if (!state.ballSettled) {
               state.ballSettled = true;
@@ -414,36 +405,28 @@ export default function RouletteWheel3D() {
       }
     }
 
-
     function loop() {
       const state = stateRef.current;
       if (state.phase !== "idle") updatePhysics();
 
       ctx.clearRect(0, 0, SIZE, SIZE);
+      drawWoodRing();
+      drawNumberCrown(state.wheelRotation);
+      drawConeAndTurret();
 
-      // Draw wheel layers
-      drawWoodRing(ctx);
-      drawNumberCrown(ctx, state.wheelRotation);
-      drawConeAndTurret(ctx);
-
-      // Draw ball
       if (state.phase !== "idle") {
-        drawBall(ctx, state.ballAngle, state.ballRadius);
+        drawBall(state.ballAngle, state.ballRadius);
       }
 
-      // Draw winning number overlay
       if (state.showResult && state.targetNumber >= 0) {
-        drawWinningNumber(ctx, state.targetNumber);
+        drawWinningNumber(state.targetNumber);
       }
 
       animationRef.current = requestAnimationFrame(loop);
     }
 
     loop();
-
-    return () => {
-      cancelAnimationFrame(animationRef.current);
-    };
+    return () => { cancelAnimationFrame(animationRef.current); };
   }, [C, OUTER_R, WOOD_R, NUM_RING_OUTER, NUM_RING_INNER, CONE_R, BALL_TRACK, SIZE, SEGMENTS, SEG_ANGLE, spinComplete]);
 
   return (

@@ -217,10 +217,10 @@ export const useGameStore = create<GameState>()(
           },
         });
 
-        // Auto-transition back to betting
+        // Auto-transition back to betting (longer pause to appreciate result)
         setTimeout(() => {
           set({ phase: "betting", currentBets: [] });
-        }, 4000);
+        }, 5000);
       },
 
       setChipValue: (value: number) => {

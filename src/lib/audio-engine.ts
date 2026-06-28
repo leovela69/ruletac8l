@@ -41,7 +41,7 @@ class AudioEngine {
     osc.stop(this.ctx.currentTime + 0.03);
   }
 
-  // Continuous spinning sound (wooden wheel + ball rolling)
+  // Continuous spinning sound (wooden wheel + ball rolling on track)
   playSpinning(duration: number): { stop: () => void } {
     this.ensureCtx();
     if (!this.ctx || !this.masterGain) return { stop: () => {} };
@@ -51,26 +51,43 @@ class AudioEngine {
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
 
-    // Generate filtered noise that decelerates
+    // Generate realistic wheel spin sound:
+    // - continuous rumble (wooden wheel on axis)
+    // - rhythmic ball-on-track clicking that decelerates naturally
     for (let i = 0; i < bufferSize; i++) {
       const progress = i / bufferSize;
-      const amplitude = 0.08 * (1 - progress * 0.7);
-      // Add rhythmic clicking pattern that slows down
-      const clickRate = 60 * (1 - progress * 0.8);
+      // Ease-out curve: fast start, very slow end
+      const speedCurve = Math.pow(1 - progress, 0.4);
+      
+      // Base rumble
+      const rumble = (Math.random() * 2 - 1) * 0.04 * speedCurve;
+      
+      // Ball rolling clicks that slow down over time
+      const clickRate = 80 * speedCurve; // Starts fast, gets slower
       const clickPhase = (i / this.ctx.sampleRate) * clickRate;
-      const click = Math.sin(clickPhase * Math.PI * 2) > 0.9 ? 0.3 : 0;
-      data[i] = (Math.random() * 2 - 1) * amplitude + click * (1 - progress);
+      const clickSharpness = Math.sin(clickPhase * Math.PI * 2);
+      const click = clickSharpness > 0.92 ? 0.25 * speedCurve : 0;
+      
+      // Gentle whoosh undertone
+      const whoosh = Math.sin(i * 0.01 * speedCurve) * 0.02 * speedCurve;
+      
+      data[i] = rumble + click + whoosh;
     }
 
     noise.buffer = buffer;
+    
+    // Bandpass filter for wooden character
     const filter = this.ctx.createBiquadFilter();
     filter.type = "bandpass";
-    filter.frequency.value = 1200;
-    filter.Q.value = 2;
+    filter.frequency.value = 900;
+    filter.Q.value = 1.5;
 
+    // Volume envelope: ramps up quickly, sustains, then fades
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + duration);
+    gain.gain.setValueAtTime(0, this.ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.5, this.ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.5, this.ctx.currentTime + duration * 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.02, this.ctx.currentTime + duration);
 
     noise.connect(filter);
     filter.connect(gain);

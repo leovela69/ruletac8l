@@ -7,6 +7,8 @@ import ControlBar from "@/components/ControlBar";
 import ResultOverlay from "@/components/ResultOverlay";
 import ChatPanel from "@/components/ChatPanel";
 import HUD from "@/components/HUD";
+import BotModerator from "@/components/BotModerator";
+import PlayersBar from "@/components/PlayersBar";
 import { useGameStore } from "@/store/game-store";
 
 export default function Home() {
@@ -22,10 +24,11 @@ export default function Home() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 border-4 border-teal-400 border-t-transparent rounded-full animate-spin" />
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-white font-sans text-lg font-bold tracking-widest">
             C8L RULETA
           </span>
+          <span className="text-gray-500 font-mono text-xs">Conectando a la mesa...</span>
         </div>
       </div>
     );
@@ -33,13 +36,19 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen flex bg-black overflow-hidden">
-      {/* HUD Stats */}
+      {/* Bot Moderator (top-left, doesn't obstruct) */}
+      <BotModerator />
+
+      {/* HUD Stats (top-right) */}
       <HUD />
 
-      {/* Main game area - horizontal layout */}
-      <div className="flex-1 flex items-center justify-center p-4 gap-6">
-        {/* LEFT: Betting Table */}
-        <div className="flex flex-col gap-3 max-w-[520px]">
+      {/* Players Bar (bottom-left) */}
+      <PlayersBar />
+
+      {/* Main game area - horizontal layout: Table LEFT, Wheel RIGHT */}
+      <div className="flex-1 flex items-center justify-center p-4 gap-8">
+        {/* LEFT: Betting Table + Controls */}
+        <div className="flex flex-col gap-3 max-w-[540px]">
           <BettingTable3D />
           <ControlBar />
         </div>
