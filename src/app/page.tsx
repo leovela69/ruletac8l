@@ -7,6 +7,7 @@ import HistoryPanel from "@/components/HistoryPanel";
 import ControlBar from "@/components/ControlBar";
 import ResultOverlay from "@/components/ResultOverlay";
 import ChatPanel from "@/components/ChatPanel";
+import Logo from "@/components/Logo";
 import { useGameStore } from "@/store/game-store";
 
 export default function Home() {
@@ -40,15 +41,18 @@ export default function Home() {
 
       {/* Main game area */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-between py-4 px-4 min-w-0">
-        {/* Header */}
+        {/* Header with Logo */}
         <div className="w-full max-w-4xl flex items-center justify-between mb-2">
-          <h1 className="text-casino-gold font-game text-sm tracking-[0.3em] uppercase">
-            C8L Ruleta
-          </h1>
-          <span className="text-green-400 font-game text-[10px] flex items-center gap-1">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            EN VIVO
-          </span>
+          <Logo size="md" />
+          <div className="flex items-center gap-3">
+            <span className="text-green-400 font-game text-[10px] flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              EN VIVO
+            </span>
+            <span className="text-gray-600 font-game text-[9px]">
+              Mesa #1
+            </span>
+          </div>
         </div>
 
         {/* Wheel + History area */}
