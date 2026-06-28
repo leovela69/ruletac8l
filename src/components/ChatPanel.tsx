@@ -113,57 +113,60 @@ export default function ChatPanel() {
   return (
     <div className="flex flex-col h-full bg-black/80 backdrop-blur-md border-l border-white/10">
       {/* Header with close button */}
-      <div className="p-3 border-b border-white/10">
-        <div className="flex items-center justify-between">
-          <span className="text-white font-mono text-xs font-bold uppercase tracking-wider">
-            💬 Chat Mesa
+      <div className="p-3 border-b border-white/10 flex-shrink-0">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-white font-mono text-[10px] font-bold uppercase tracking-wider">
+            💬 Chat
           </span>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 font-mono text-[9px]">
-              {botPlayers.length + 1} online
-            </span>
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 bg-white/5 rounded-full px-2 py-0.5">
+              <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
+              <span className="text-gray-400 font-mono text-[8px]">
+                {botPlayers.length + 1}
+              </span>
+            </div>
             <button
               onClick={toggleChat}
-              className="w-6 h-6 rounded-full bg-white/10 hover:bg-red-500/30
+              className="w-5 h-5 rounded-full bg-white/10 hover:bg-red-500/30
                          flex items-center justify-center transition-colors group"
               title="Cerrar chat"
             >
-              <span className="text-gray-400 group-hover:text-red-300 text-xs font-bold">✕</span>
+              <span className="text-gray-400 group-hover:text-red-300 text-[10px] font-bold">✕</span>
             </button>
           </div>
         </div>
 
-        {/* Online Players - circular avatars */}
-        <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto pb-1">
+        {/* Online Players - smaller avatars in a single row */}
+        <div className="flex items-center gap-1 overflow-x-auto">
           {/* Current user */}
           {session?.user && (
             <div className="relative flex-shrink-0">
-              <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-teal-400 shadow-[0_0_6px_rgba(45,212,191,0.4)]">
+              <div className="w-7 h-7 rounded-full overflow-hidden border-2 border-teal-400 shadow-[0_0_4px_rgba(45,212,191,0.3)]">
                 {session.user.image ? (
                   <Image
                     src={session.user.image}
                     alt={session.user.name || "Tu"}
-                    width={36}
-                    height={36}
+                    width={28}
+                    height={28}
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-teal-600 flex items-center justify-center text-white text-sm font-bold">
+                  <div className="w-full h-full bg-teal-600 flex items-center justify-center text-white text-[10px] font-bold">
                     {(session.user.name || "T")[0]}
                   </div>
                 )}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-black" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-black" />
             </div>
           )}
 
           {/* Bot players */}
           {botPlayers.map((bot) => (
             <div key={bot.id} className="relative flex-shrink-0" title={bot.name}>
-              <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-gray-600 bg-gray-800 flex items-center justify-center">
-                <span className="text-lg">{bot.avatar}</span>
+              <div className="w-7 h-7 rounded-full overflow-hidden border-2 border-gray-600 bg-gray-800 flex items-center justify-center">
+                <span className="text-sm">{bot.avatar}</span>
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-black" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-black" />
             </div>
           ))}
         </div>

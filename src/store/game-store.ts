@@ -370,7 +370,7 @@ export const useGameStore = create<GameState>()(
       },
     }),
     {
-      name: "c8l-ruleta-v2",
+      name: "c8l-ruleta-v3",
       partialize: (state) => ({
         player: state.player,
       }),

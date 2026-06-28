@@ -82,6 +82,8 @@ export function getWheelPosition(number: number): number {
 
 export function evaluateBet(bet: Bet, result: number): { won: boolean; payout: number } {
   const won = bet.numbers.includes(result);
+  // Payout includes the original bet amount returned + winnings
+  // If lost, payout is 0 (bet is forfeit)
   const payout = won ? bet.amount * PAYOUTS[bet.type] + bet.amount : 0;
   return { won, payout };
 }

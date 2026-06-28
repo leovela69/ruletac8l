@@ -56,9 +56,9 @@ export default function Home() {
       {/* Main game area - horizontal layout: Table LEFT, Wheel RIGHT */}
       <div className={`flex-1 flex items-center justify-center p-4 gap-8 pl-[240px] transition-all duration-300
         ${chatOpen ? "pr-[16px]" : "pr-4"}`}>
-        {/* Tapete negro con borde dorado - solo envuelve mesa + ruleta */}
+        {/* Tapete difuminado - cristal oscuro con borde dorado */}
         <div className="relative rounded-2xl p-6
-                        bg-gradient-to-b from-[#1a1a1a] via-[#0d0d0d] to-[#111111]
+                        bg-black/40 backdrop-blur-md
                         border-2 border-amber-500/50
                         shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_60px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,215,0,0.1)]">
           {/* Inner gold accent line */}
